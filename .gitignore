@@ -1,0 +1,3 @@
+./backend/.env*
+.gen_context.py
+venv/
