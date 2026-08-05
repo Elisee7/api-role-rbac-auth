@@ -1,0 +1,89 @@
+[
+  {
+    "model": "roles.permission",
+    "pk": 1,
+    "fields": {
+      "code": "users.read",
+      "description": "Consulter la liste/détails des utilisateurs",
+      "created_at": "2026-08-05T00:00:00Z"
+    }
+  },
+  {
+    "model": "roles.permission",
+    "pk": 2,
+    "fields": {
+      "code": "users.write",
+      "description": "Créer et modifier des utilisateurs",
+      "created_at": "2026-08-05T00:00:00Z"
+    }
+  },
+  {
+    "model": "roles.permission",
+    "pk": 3,
+    "fields": {
+      "code": "users.delete",
+      "description": "Supprimer des utilisateurs",
+      "created_at": "2026-08-05T00:00:00Z"
+    }
+  },
+  {
+    "model": "roles.permission",
+    "pk": 4,
+    "fields": {
+      "code": "roles.manage",
+      "description": "Gérer les rôles et permissions",
+      "created_at": "2026-08-05T00:00:00Z"
+    }
+  },
+  {
+    "model": "roles.permission",
+    "pk": 5,
+    "fields": {
+      "code": "profile.read",
+      "description": "Consulter son propre profil",
+      "created_at": "2026-08-05T00:00:00Z"
+    }
+  },
+  {
+    "model": "roles.permission",
+    "pk": 6,
+    "fields": {
+      "code": "profile.write",
+      "description": "Modifier son propre profil",
+      "created_at": "2026-08-05T00:00:00Z"
+    }
+  },
+  {
+    "model": "roles.role",
+    "pk": 1,
+    "fields": {
+      "name": "ADMIN",
+      "description": "Administrateur système",
+      "permissions": [1, 2, 3, 4, 5, 6],
+      "created_at": "2026-08-05T00:00:00Z",
+      "updated_at": "2026-08-05T00:00:00Z"
+    }
+  },
+  {
+    "model": "roles.role",
+    "pk": 2,
+    "fields": {
+      "name": "MANAGER",
+      "description": "Gestionnaire",
+      "permissions": [1, 2, 5, 6],
+      "created_at": "2026-08-05T00:00:00Z",
+      "updated_at": "2026-08-05T00:00:00Z"
+    }
+  },
+  {
+    "model": "roles.role",
+    "pk": 3,
+    "fields": {
+      "name": "USER",
+      "description": "Utilisateur standard",
+      "permissions": [5, 6],
+      "created_at": "2026-08-05T00:00:00Z",
+      "updated_at": "2026-08-05T00:00:00Z"
+    }
+  }
+]
