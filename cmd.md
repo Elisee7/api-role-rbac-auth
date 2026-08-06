@@ -1,18 +1,74 @@
+# Commandes de déploiement et gestion du projet
+
+## Dépendances
+```bash
+# Générer le fichier requirements.txt
 pip freeze > requirements.txt
+```
 
-python manage.py makemigrations 
+## Base de données - Migrations
+```bash
+# Créer les migrations
+python manage.py makemigrations
 
+# Appliquer les migrations
 python manage.py migrate
+```
 
+## Base de données - Accès PostgreSQL
+```bash
+# Se connecter en tant qu'utilisateur postgres (admin)
 sudo -u postgres psql
 
+# Ou se connecter via Django dbshell
+python manage.py dbshell
+
+# Ou connexion directe avec utilisateur dédié
+psql -U auth_user -d auth_roles_db -h localhost
+```
+
+## Commandes PostgreSQL utiles
+```sql
+-- Lister toutes les tables
+\dt
+
+-- Voir la structure d'une table spécifique
+\d nom_table
+
+-- Quitter psql
+\q
+```
+
+## Utilisateur administrateur
+```bash
+# Créer un superutilisateur Django
 python manage.py createsuperuser
+```
 
-python manage.py dbshell # se connecter a la bd oubien psql -U auth_user -d auth_roles_db -h localhost
+## Tests
+```bash
+# Exécuter les tests pour le module accounts
+python manage.py test apps.accounts
+```
 
-\dt # afficher la liste des tables
-
-\d : Pour voir les colonnes et la structure d'une table spécifique
-
+## Authentification JWT
+```bash
+# Installer djangorestframework-simplejwt
 pip install djangorestframework-simplejwt
+```
 
+## Données initiales (fixtures)
+```bash
+# Charger les rôles initiaux depuis apps/roles/fixtures/initial_roles.json
+python manage.py loaddata initial_roles
+```
+
+## Ordre d'exécution recommandé
+1. `pip freeze > requirements.txt`
+2. `python manage.py makemigrations`
+3. `python manage.py migrate`
+4. `python manage.py createsuperuser`
+5. `python manage.py test apps.accounts`  # Nouvelle étape
+6. `pip install djangorestframework-simplejwt`
+7. `python manage.py loaddata initial_roles`
+8. Vérification optionnelle : `python manage.py dbshell` puis `\dt`

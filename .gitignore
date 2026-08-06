@@ -1,3 +1,26 @@
-./backend/.env*
-.gen_context.py
+backend/.env
+backend/.env*
+gen_context.py
+context.txt
+updated_file.txt
+
+# Keep the example file
+!backend/.env.example
+
+# Python / Django
+*.pyc
+__pycache__/
+*.sqlite3
+media/
+staticfiles/
+
+# Environnement virtuel & secrets
+.env
 venv/
+.venv/
+
+# IDE
+.vscode/
+.kombai/
+.clinerules/
+.idea/
