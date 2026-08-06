@@ -7,6 +7,12 @@ import sys
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+
+    # Ajout du dossier courant et de 'apps' au path
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, base_dir)
+    sys.path.insert(0, os.path.join(base_dir, 'apps'))
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
