@@ -69,6 +69,7 @@ python manage.py loaddata initial_roles
 3. `python manage.py migrate`
 4. `python manage.py createsuperuser`
 5. `python manage.py test apps.accounts`  # Nouvelle étape
-6. `pip install djangorestframework-simplejwt`
-7. `python manage.py loaddata initial_roles`
-8. Vérification optionnelle : `python manage.py dbshell` puis `\dt`
+6. `python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'`  # Générer une clé secrète
+7. `pip install djangorestframework-simplejwt`
+8. `python manage.py loaddata initial_roles`
+9. Vérification optionnelle : `python manage.py dbshell` puis `\dt`
