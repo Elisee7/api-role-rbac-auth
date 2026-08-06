@@ -41,7 +41,7 @@ jobs:
 
       - name: Run Migrations & Tests
         env:
-          SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
           DEBUG: 'True'
           DB_NAME: auth_roles_db
           DB_USER: auth_user
