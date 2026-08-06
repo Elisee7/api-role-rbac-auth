@@ -32,7 +32,6 @@ class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
         required=True,
-        validators=[validate_password],
         help_text="Mot de passe conforme aux exigences de sécurité Django."
     )
 
@@ -44,9 +43,24 @@ class RegisterSerializer(serializers.ModelSerializer):
             'last_name': {'required': False},
         }
 
+    def validate(self, attrs):
+        # Instanciation d'un utilisateur candidat en mémoire pour valider la similitude d'attributs
+        candidate_user = User(
+            email=attrs.get('email', ''),
+            username=attrs.get('username', ''),
+            first_name=attrs.get('first_name', ''),
+            last_name=attrs.get('last_name', ''),
+        )
+        validate_password(attrs['password'], candidate_user)
+        return attrs
+
     def create(self, validated_data):
         # Récupération du rôle par défaut 'USER' (s'il existe en BDD)
         default_role = Role.objects.filter(name='USER').first()
+        if default_role is None:
+            raise serializers.ValidationError(
+                {'non_field_errors': ['Default USER role is not configured.']}
+            )
         
         # Création sécurisée de l'utilisateur avec hachage automatique du mot de passe
         user = User.objects.create_user(
@@ -58,3 +72,4 @@ class RegisterSerializer(serializers.ModelSerializer):
             role=default_role
         )
         return user
+
