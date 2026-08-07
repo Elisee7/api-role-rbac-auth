@@ -3,8 +3,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from apps.roles.models import Role
-import jwt
-from django.conf import settings
+from rest_framework_simplejwt.state import token_backend
 
 User = get_user_model()
 
@@ -75,11 +74,13 @@ class LoginAPITestCase(APITestCase):
         self.assertIn('refresh', response.data)
         self.assertEqual(response.data['user']['email'], self.email)
 
-        # Vérification du contenu du token (Claims)
+        # Vérification sécurisée du contenu du token (Claims + Signature)
         access_token = response.data['access']
-        decoded_payload = jwt.decode(access_token, settings.SECRET_KEY, algorithms=["HS256"], options={"verify_signature": False})
+        decoded_payload = token_backend.decode(access_token)
+        
         self.assertEqual(decoded_payload['role'], 'USER')
         self.assertEqual(decoded_payload['email'], self.email)
+        self.assertEqual(decoded_payload['username'], self.user.username)
 
     def test_login_invalid_credentials(self):
         """
