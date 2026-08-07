@@ -5,7 +5,8 @@ Description : Vues pour l'authentification et la gestion des comptes utilisateur
 from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from apps.accounts.serializers import RegisterSerializer, UserSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from apps.accounts.serializers import RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer
 
 
 class RegisterView(APIView):
@@ -24,3 +25,10 @@ class RegisterView(APIView):
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Endpoint : POST /api/auth/login/
+    Permet la connexion d'un utilisateur et l'émission des tokens JWT (access + refresh).
+    """
+    serializer_class = CustomTokenObtainPairSerializer

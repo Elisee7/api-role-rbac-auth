@@ -6,6 +6,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from apps.roles.models import Role
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 User = get_user_model()
 
@@ -73,3 +74,25 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         return user
 
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Sérialiseur de connexion JWT (AUTH-011 & AUTH-014).
+    Authentifie l'utilisateur via son email et injecte le rôle dans le payload du token.
+    """
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+
+        # AUTH-014 : Custom claims dans le JWT
+        token['email'] = user.email
+        token['username'] = user.username
+        token['role'] = user.role.name if user.role else None
+
+        return token
+
+    def validate(self, attrs):
+        data = super().validate(attrs)
+
+        # Enrichissement du corps de la réponse JSON au login
+        data['user'] = UserSerializer(self.user).data
+        return data
