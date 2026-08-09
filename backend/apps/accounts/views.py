@@ -6,7 +6,9 @@ from rest_framework import status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
-from apps.accounts.serializers import RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer
+from apps.accounts.serializers import ( RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer, 
+                                       LogoutSerializer)
+
 
 
 class RegisterView(APIView):
@@ -32,3 +34,27 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     Permet la connexion d'un utilisateur et l'émission des tokens JWT (access + refresh).
     """
     serializer_class = CustomTokenObtainPairSerializer
+
+class LogoutView(APIView):
+    """
+    Endpoint : POST /api/auth/logout/
+    Permet à un utilisateur authentifié de se déconnecter en invalidant
+    son refresh token via la blacklist.
+    
+    Exige un Access Token valide dans les headers Authorization (Bearer <token>).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """
+        Reçoit le refresh token dans le corps de la requête et le révoque.
+        """
+        serializer = LogoutSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"detail": "Déconnexion réussie. Le token a été révoqué."},
+                status=status.HTTP_205_RESET_CONTENT
+            )
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -4,6 +4,7 @@ from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from apps.roles.models import Role
 from rest_framework_simplejwt.state import token_backend
+from rest_framework_simplejwt.tokens import RefreshToken
 
 User = get_user_model()
 
@@ -152,3 +153,58 @@ class TokenRefreshAPITestCase(APITestCase):
         }, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+class LogoutTests(APITestCase):
+    """
+    Suite de tests unitaires pour le ticket AUTH-013 (Déconnexion / Blacklist).
+    """
+
+    def setUp(self):
+        """
+        Initialisation de l'utilisateur de test et génération directe des tokens JWT.
+        """
+        self.user_data = {
+            'username': 'logoutuser',
+            'email': 'logoutuser@example.com',
+            'password': 'StrongPassword123!'
+        }
+        self.user = User.objects.create_user(**self.user_data)
+
+        # Génération directe et fiable des tokens via SimpleJWT (sans repasser par l'API de login)
+        refresh = RefreshToken.for_user(self.user)
+        self.access_token = str(refresh.access_token)
+        self.refresh_token = str(refresh)
+
+        self.logout_url = reverse('auth-logout')
+
+    def test_logout_success(self):
+        """
+        Vérifie qu'un utilisateur authentifié peut révoquer son refresh token.
+        """
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
+        response = self.client.post(self.logout_url, {'refresh': self.refresh_token})
+
+        self.assertEqual(response.status_code, status.HTTP_205_RESET_CONTENT)
+
+        # Vérification : Le refresh token révoqué ne doit plus permettre de rafraîchir la session
+        refresh_url = reverse('auth-refresh')
+        refresh_response = self.client.post(refresh_url, {'refresh': self.refresh_token})
+        self.assertEqual(refresh_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_unauthenticated(self):
+        """
+        Vérifie qu'une requête sans Access Token dans le header est rejetée (401 Unauthorized).
+        """
+        # On s'assure qu'aucun header d'autorisation n'est présent
+        self.client.credentials()
+        response = self.client.post(self.logout_url, {'refresh': self.refresh_token})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_logout_invalid_refresh_token(self):
+        """
+        Vérifie qu'un refresh token invalide renvoie une erreur 400 Bad Request.
+        """
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
+        response = self.client.post(self.logout_url, {'refresh': 'token_invalid_exemple'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+

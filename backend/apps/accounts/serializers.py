@@ -7,6 +7,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from apps.roles.models import Role
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+
 
 User = get_user_model()
 
@@ -96,3 +98,32 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Enrichissement du corps de la réponse JSON au login
         data['user'] = UserSerializer(self.user).data
         return data
+
+class LogoutSerializer(serializers.Serializer):
+    """
+    Sérialiseur pour valider le refresh token fourni lors de la déconnexion.
+    Effectue la mise en liste noire (blacklist) du token lors de l'exécution de save().
+    """
+    refresh = serializers.CharField(
+        help_text="Le token de rafraîchissement à invalider."
+    )
+
+    def validate(self, attrs):
+        """
+        Vérification de la présence et du format du token.
+        """
+        self.token = attrs.get('refresh')
+        return attrs
+
+    def save(self, **kwargs):
+        """
+        Invalide le refresh token en l'ajoutant à la liste noire (Blacklist).
+        Lève une TokenError si le token est expiré ou invalide.
+        """
+        try:
+            token = RefreshToken(self.token)
+            token.blacklist()
+        except TokenError:
+            raise serializers.ValidationError(
+                {'refresh': 'Token invalide ou déjà révoqué.'}
+            )
