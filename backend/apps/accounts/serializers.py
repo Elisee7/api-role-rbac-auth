@@ -127,3 +127,4 @@ class LogoutSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {'refresh': 'Token invalide ou déjà révoqué.'}
             )
+
