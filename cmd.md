@@ -75,4 +75,5 @@ python manage.py loaddata initial_roles
 9. Vérification optionnelle : `python manage.py dbshell` puis `\dt`
 
 ## Site utile
-- Copie la valeur de "access" et colle-la sur jwt.io. Tu verras le payload décodé dans la partie droite.
+- Décode le payload localement. Ne colle jamais un jeton d'accès réel sur un service tiers.
+- Si jwt.io est nécessaire, utilise uniquement un jeton de test sans privilèges ni données sensibles.
