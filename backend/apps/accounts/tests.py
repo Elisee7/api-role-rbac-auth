@@ -92,3 +92,63 @@ class LoginAPITestCase(APITestCase):
         }
         response = self.client.post(self.login_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+class TokenRefreshAPITestCase(APITestCase):
+    """
+    Test 3 du Cahier des Charges : Rafraîchissement du token JWT et rotation.
+    """
+    def setUp(self):
+        self.user_role = Role.objects.create(name='USER', description='Utilisateur standard')
+        self.email = "refreshuser@example.com"
+        self.password = "StrongPassword123!"
+        self.user = User.objects.create_user(
+            email=self.email,
+            username="refreshuser",
+            password=self.password,
+            role=self.user_role
+        )
+        self.login_url = reverse('auth-login')
+        self.refresh_url = reverse('auth-refresh')
+
+        # Connexion initiale pour obtenir les tokens
+        response = self.client.post(self.login_url, {
+            "email": self.email,
+            "password": self.password
+        }, format='json')
+        self.initial_refresh = response.data['refresh']
+        self.initial_access = response.data['access']
+
+    def test_token_refresh_success_and_rotation(self):
+        """
+        1. Vérifie le rafraîchissement réussi de l'access token.
+        2. Vérifie que la rotation génère un tout nouveau refresh token.
+        3. Vérifie que l'ancien refresh token est désormais invalidé (blacklisté).
+        """
+        # Étape 1 : Demande de rafraîchissement avec le token initial
+        response = self.client.post(self.refresh_url, {
+            "refresh": self.initial_refresh
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+
+        new_refresh = response.data['refresh']
+        self.assertNotEqual(self.initial_refresh, new_refresh)  # Rotation effectuée
+
+        # Étape 2 : Tentative de réutilisation de l'ancien refresh token (Doit échouer)
+        failed_response = self.client.post(self.refresh_url, {
+            "refresh": self.initial_refresh
+        }, format='json')
+
+        self.assertEqual(failed_response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_token_refresh_invalid_token(self):
+        """
+        Vérifie qu'un token invalide ou corrompu est rejeté avec un statut 401.
+        """
+        response = self.client.post(self.refresh_url, {
+            "refresh": "invalid.token.string"
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
