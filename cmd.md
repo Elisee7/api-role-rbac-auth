@@ -73,3 +73,6 @@ python manage.py loaddata initial_roles
 7. `pip install djangorestframework-simplejwt`
 8. `python manage.py loaddata initial_roles`
 9. Vérification optionnelle : `python manage.py dbshell` puis `\dt`
+
+## Site utile
+- Copie la valeur de "access" et colle-la sur jwt.io. Tu verras le payload décodé dans la partie droite.
