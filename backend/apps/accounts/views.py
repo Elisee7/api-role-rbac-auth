@@ -7,22 +7,24 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.accounts.serializers import ( RegisterSerializer, UserProfileUpdateSerializer, UserSerializer, CustomTokenObtainPairSerializer, 
                                        LogoutSerializer, UserAssignRoleSerializer, UserDetailSerializer,
                                        )
 from apps.roles.models import Role
 from apps.roles.permissions import HasRolePermission
-from apps.accounts.serializers import UserMeSerializer
+from rest_framework.permissions import AllowAny
 
 User = get_user_model()
 
 class RegisterView(APIView):
     """
     Endpoint : POST /api/auth/register/
-    Permet l'inscription d'un nouvel utilisateur (accès public).
+    Permet l'inscription d'un nouvel utilisateur.
     """
+    serializer_class = RegisterSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_scope = "auth"
 
     def post(self, request, *args, **kwargs):
         serializer = RegisterSerializer(data=request.data)
@@ -40,6 +42,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     Permet la connexion d'un utilisateur et l'émission des tokens JWT (access + refresh).
     """
     serializer_class = CustomTokenObtainPairSerializer
+    permission_classes = [permissions.AllowAny]
+    throttle_scope = "auth"
 
 class LogoutView(APIView):
     """
@@ -49,7 +53,9 @@ class LogoutView(APIView):
     
     Exige un Access Token valide dans les headers Authorization (Bearer <token>).
     """
+    serializer_class = LogoutSerializer
     permission_classes = [permissions.IsAuthenticated]
+    throttle_scope = "auth"
 
     def post(self, request, *args, **kwargs):
         """
@@ -60,7 +66,7 @@ class LogoutView(APIView):
             serializer.save()
             return Response(
                 {"detail": "Déconnexion réussie. Le token a été révoqué."},
-                status=status.HTTP_205_RESET_CONTENT
+                status=status.HTTP_200_OK
             )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -110,7 +116,6 @@ class UserMeView(generics.RetrieveUpdateAPIView):
     """
     http_method_names = ["get", "patch", "head", "options"]
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = UserMeSerializer
 
     def get_object(self):
         # Récupère directement l'utilisateur lié au Token JWT
@@ -120,6 +125,15 @@ class UserMeView(generics.RetrieveUpdateAPIView):
         """
         Sélectionne le sérialiseur adapté selon la méthode HTTP.
         """
-        if self.request.method in ['PATCH', 'PUT']:
+        if self.request.method == "PATCH":
             return UserProfileUpdateSerializer
         return UserDetailSerializer
+
+class ThrottledTokenRefreshView(TokenRefreshView):
+    """
+    Endpoint : POST /api/auth/refresh/
+    Rafraîchit l'access token à partir d'un refresh token valide.
+    """
+
+    permission_classes = [AllowAny]
+    throttle_scope = "auth"

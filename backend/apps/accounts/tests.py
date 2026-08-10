@@ -184,7 +184,7 @@ class LogoutTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {self.access_token}')
         response = self.client.post(self.logout_url, {'refresh': self.refresh_token})
 
-        self.assertEqual(response.status_code, status.HTTP_205_RESET_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # Vérification : Le refresh token révoqué ne doit plus permettre de rafraîchir la session
         refresh_url = reverse('auth-refresh')

@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 # Charger les variables d'environnement depuis .env
 load_dotenv()
@@ -8,18 +9,55 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+def env_bool(name: str, default: bool = False) -> bool:
+    """
+    Interprète une variable d'environnement comme booléen.
+
+    Valeurs acceptées : 1, true, yes, on.
+    """
+    value = os.getenv(name)
+
+    if value is None:
+        return default
+
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 
 # Quick-start development settings - unsuitable for production 
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ['DJANGO_SECRET_KEY']
+"""
+Sécurité : SECRET_KEY.
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+La clé secrète doit être fournie par variable d'environnement.
+Elle ne doit jamais être codée en dur ni commitée avec une vraie valeur.
+"""
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        "La variable d'environnement DJANGO_SECRET_KEY est obligatoire."
+    )
 
+"""
+Mode debug.
+
+Doit être True uniquement en développement local.
+Doit être False en staging et production.
+"""
+DEBUG = env_bool("DEBUG", default=False)
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.getenv("ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
+
+if not ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        "La variable d'environnement ALLOWED_HOSTS est obligatoire."
+    )
 
 # Application definition
 
@@ -34,17 +72,18 @@ INSTALLED_APPS = [
     # Local apps
     'apps.accounts',
     'apps.api',
-    # 'apps.core',
     'apps.roles',
 
     # Apps tiers
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist', # Pour la gestion de la blacklist
-
+    "corsheaders",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -79,15 +118,25 @@ Description : Configuration de la base de données PostgreSQL.
 """
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'auth_roles_db'),
-        'USER': os.getenv('DB_USER', 'postgres'),
-        'PASSWORD': os.getenv('DB_PASSWORD', '7000'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+    "default": {
+        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT"),
     }
 }
+
+# Vérification explicite des variables obligatoires
+REQUIRED_DB_VARS = ["DB_NAME", "DB_USER", "DB_PASSWORD", "DB_HOST", "DB_PORT"]
+
+missing_db_vars = [var for var in REQUIRED_DB_VARS if not os.getenv(var)]
+
+if missing_db_vars:
+    raise ImproperlyConfigured(
+        f"Variables d'environnement manquantes : {', '.join(missing_db_vars)}"
+    )
 
 
 # Password validation
@@ -144,6 +193,14 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "rest_framework.throttling.ScopedRateThrottle",
+    ),
+    "DEFAULT_THROTTLE_RATES": {
+        # Limitation des endpoints d'authentification sensibles
+        "auth": os.getenv("THROTTLE_AUTH_RATE", "10/minute"),
+    },
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 
@@ -168,4 +225,70 @@ SIMPLE_JWT = {
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
 
     'TOKEN_OBTAIN_SERIALIZER': 'apps.accounts.serializers.CustomTokenObtainPairSerializer',
+}
+
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+# En développement, on peut autoriser explicitement des origines locales.
+# En production, la variable CORS_ALLOWED_ORIGINS doit être définie.
+CORS_ALLOW_CREDENTIALS = False
+
+"""
+Durcissement de sécurité pour la production.
+Ces réglages ne doivent pas être actifs en développement local.
+"""
+
+"""
+Durcissement de sécurité pour la production.
+
+Ces réglages sont activés uniquement lorsque DEBUG=False.
+Ils ne doivent pas être utilisés tels quels en développement local HTTP,
+car ils peuvent casser l'accès local (redirection HTTPS, cookies secure, etc.).
+"""
+if not DEBUG:
+    # Redirige toutes les requêtes HTTP vers HTTPS.
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
+
+    # Cookies sécurisés.
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # HTTP Strict Transport Security.
+    # Commencer par une durée courte, puis augmenter après validation.
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "3600"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+        default=True
+    )
+    SECURE_HSTS_PRELOAD = env_bool(
+        "SECURE_HSTS_PRELOAD",
+        default=False
+    )
+
+    # Derrière un reverse proxy (Nginx, Traefik, Render, Railway, etc.),
+    # Django doit pouvoir détecter le protocole original via X-Forwarded-Proto.
+    if env_bool("SECURE_PROXY_SSL_HEADER", default=False):
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "API Auth + Roles",
+    "DESCRIPTION": (
+        "API d'authentification JWT avec gestion des rôles et permissions. "
+        "Conforme au cahier des charges Auth + Roles v1.0."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "TAGS": [
+        {"name": "Auth", "description": "Inscription, connexion, refresh et logout"},
+        {"name": "Users", "description": "Profil utilisateur"},
+        {"name": "Roles", "description": "Gestion des rôles et permissions"},
+    ],
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+    },
 }
