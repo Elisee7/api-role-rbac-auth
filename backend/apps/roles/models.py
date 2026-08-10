@@ -46,3 +46,8 @@ class Role(models.Model):
     def __str__(self):
         return self.name
 
+    def has_permission(self, permission_code: str) -> bool:
+        """
+        Vérifie si ce rôle contient une permission spécifique par son code.
+        """
+        return self.permissions.filter(code=permission_code).exists()
