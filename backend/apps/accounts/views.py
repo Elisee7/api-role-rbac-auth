@@ -105,6 +105,7 @@ class UserAssignRoleView(generics.GenericAPIView):
         )
 
 class UserMeView(generics.RetrieveUpdateAPIView):
+    http_method_names = ["get", "patch", "head", "options"]
     """
     AUTH-023: Permet à l'utilisateur authentifié de récupérer (GET) 
     et de mettre à jour partiellement (PATCH) son propre profil.

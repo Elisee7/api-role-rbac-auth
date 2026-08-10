@@ -303,3 +303,19 @@ class UserMeTests(APITestCase):
         self.user.refresh_from_db()
         # L'email ne doit pas avoir changé
         self.assertEqual(self.user.email, "testuser@example.com")
+
+    def test_put_user_me_not_allowed(self):
+        """Vérifie que la méthode PUT est rejetée avec un statut 405 Method Not Allowed."""
+        self.client.force_authenticate(user=self.user)
+        payload = {"first_name": "Jane", "last_name": "Smith"}
+        response = self.client.put(self.url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_head_user_me_success(self):
+        """Vérifie que la méthode HEAD retourne un 200 OK avec des en-têtes mais sans body."""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.head(self.url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.content, b'')  # Le corps de la réponse doit être vide
