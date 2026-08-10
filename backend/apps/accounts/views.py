@@ -2,14 +2,19 @@
 Fichier : apps/accounts/views.py
 Description : Vues pour l'authentification et la gestion des comptes utilisateurs.
 """
-from rest_framework import status, permissions
+from rest_framework import status, permissions, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
 from apps.accounts.serializers import ( RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer, 
-                                       LogoutSerializer)
+                                       LogoutSerializer, UserAssignRoleSerializer, UserDetailSerializer,
+                                       )
+from apps.roles.models import Role
+from apps.roles.permissions import HasRolePermission
 
-
+User = get_user_model()
 
 class RegisterView(APIView):
     """
@@ -58,3 +63,38 @@ class LogoutView(APIView):
             )
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+class UserAssignRoleView(generics.GenericAPIView):
+    """
+    Endpoint : POST /api/users/<id>/assign-role/
+    Permet à un administrateur d'assigner un rôle à un utilisateur.
+    Exige la permission 'roles.manage'.
+    """
+    permission_classes = [permissions.IsAuthenticated, HasRolePermission]
+    required_permission = 'roles.manage'
+    serializer_class = UserAssignRoleSerializer
+
+    def post(self, request, pk=None):
+        # 1. Récupération de l'utilisateur cible (404 si non trouvé)
+        target_user = get_object_or_404(User, pk=pk)
+
+        # 2. Validation des données transmises
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # 3. Récupération et assignation du rôle
+        role_id = serializer.validated_data['role_id']
+        role = Role.objects.get(id=role_id)
+        
+        target_user.role = role
+        target_user.save()
+
+        # 4. Réponse avec le profil utilisateur mis à jour
+        return Response(
+            {
+                "message": f"Rôle '{role.name}' assigné avec succès à l'utilisateur '{target_user.username}'.",
+                "user": UserDetailSerializer(target_user).data
+            },
+            status=status.HTTP_200_OK
+        )
+

@@ -5,9 +5,10 @@ Description : Sérialiseurs pour la gestion des utilisateurs et de l'authentific
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
-from apps.roles.models import Role
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from apps.roles.models import Role
+from apps.roles.serializers import RoleSerializer
 
 
 User = get_user_model()
@@ -128,3 +129,25 @@ class LogoutSerializer(serializers.Serializer):
                 {'refresh': 'Token invalide ou déjà révoqué.'}
             )
 
+class UserAssignRoleSerializer(serializers.Serializer):
+    """
+    Sérialiseur de validation pour l'assignation d'un rôle à un utilisateur.
+    """
+    role_id = serializers.IntegerField(required=True, help_text="ID du rôle à attribuer")
+
+    def validate_role_id(self, value):
+        if not Role.objects.filter(id=value).exists():
+            raise serializers.ValidationError("Le rôle spécifié n'existe pas.")
+        return value
+
+
+class UserDetailSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur détaillé pour afficher les informations de l'utilisateur avec son rôle.
+    """
+    role = RoleSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ('id', 'email', 'username', 'role', 'is_active', 'date_joined')
+        read_only_fields = fields

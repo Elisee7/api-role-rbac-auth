@@ -2,7 +2,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
-from apps.roles.models import Role
+from apps.roles.models import Role, Permission
 from rest_framework_simplejwt.state import token_backend
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -208,3 +208,50 @@ class LogoutTests(APITestCase):
         response = self.client.post(self.logout_url, {'refresh': 'token_invalid_exemple'})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+class UserAssignRoleTestCase(APITestCase):
+    def setUp(self):
+        # Permissions & Rôles
+        self.perm_manage = Permission.objects.create(code='roles.manage', description='Gérer les rôles')
+        
+        self.admin_role = Role.objects.create(name='ADMIN')
+        self.admin_role.permissions.add(self.perm_manage)
+        
+        self.user_role = Role.objects.create(name='USER')
+        self.manager_role = Role.objects.create(name='MANAGER')
+
+        # Utilisateurs
+        self.admin_user = User.objects.create_user(
+            email="admin@example.com", username="adminuser", password="Password123!", role=self.admin_role
+        )
+        self.standard_user = User.objects.create_user(
+            email="user@example.com", username="standarduser", password="Password123!", role=self.user_role
+        )
+        self.target_user = User.objects.create_user(
+            email="target@example.com", username="targetuser", password="Password123!", role=self.user_role
+        )
+
+    def test_admin_can_assign_role(self):
+        """Un administrateur peut assigner un nouveau rôle à un utilisateur."""
+        self.client.force_authenticate(user=self.admin_user)
+        url = reverse('user-assign-role', kwargs={'pk': self.target_user.pk})
+        response = self.client.post(url, {'role_id': self.manager_role.id})
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.target_user.refresh_from_db()
+        self.assertEqual(self.target_user.role, self.manager_role)
+
+    def test_standard_user_cannot_assign_role(self):
+        """Un utilisateur standard ne peut pas assigner de rôle (403 Forbidden)."""
+        self.client.force_authenticate(user=self.standard_user)
+        url = reverse('user-assign-role', kwargs={'pk': self.target_user.pk})
+        response = self.client.post(url, {'role_id': self.manager_role.id})
+        
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_assign_invalid_role_returns_400(self):
+        """Tenter d'assigner un role_id inexistant renvoie un 400 Bad Request."""
+        self.client.force_authenticate(user=self.admin_user)
+        url = reverse('user-assign-role', kwargs={'pk': self.target_user.pk})
+        response = self.client.post(url, {'role_id': 9999})
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
