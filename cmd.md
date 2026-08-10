@@ -49,6 +49,12 @@ python manage.py createsuperuser
 ```bash
 # Exécuter les tests pour le module accounts
 python manage.py test apps.accounts
+
+# Vérifier la cohérence du projet
+python manage.py check
+
+# Vérifier les configurations pour le déploiement
+python manage.py check --deploy
 ```
 
 ## Authentification JWT
@@ -62,6 +68,19 @@ pip install djangorestframework-simplejwt
 # Charger les rôles initiaux depuis apps/roles/fixtures/initial_roles.json
 python manage.py loaddata initial_roles
 ```
+
+# Exporter toutes les variables du fichier .env.production.local
+```bash
+set -a
+source .env.production.local
+set +a
+
+# Nettoyer toutes les variables du .env.production.local
+unset DEBUG DJANGO_SECRET_KEY ALLOWED_HOSTS SECURE_SSL_REDIRECT
+unset SECURE_HSTS_SECONDS SECURE_HSTS_INCLUDE_SUBDOMAINS SECURE_HSTS_PRELOAD
+unset SECURE_PROXY_SSL_HEADER
+```
+
 
 ## Ordre d'exécution recommandé
 1. `pip freeze > requirements.txt`

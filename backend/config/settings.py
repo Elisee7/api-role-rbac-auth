@@ -16,11 +16,17 @@ def env_bool(name: str, default: bool = False) -> bool:
     Valeurs acceptées : 1, true, yes, on.
     """
     value = os.getenv(name)
-
-    if value is None:
+    if value is None or not value.strip():
         return default
 
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ImproperlyConfigured(
+        f"La variable d'environnement {name} doit être un booléen valide."
+    )
 
 
 
