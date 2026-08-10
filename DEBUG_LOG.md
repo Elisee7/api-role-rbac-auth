@@ -73,15 +73,40 @@
 
 ## 5. `TypeError: UserManager.create_user() missing 1 required positional argument: 'username'`
 
-- **Module concerné :** `apps.roles`
+- **Module concerné :** `apps.roles`, `apps.accounts`
 - **Cause :**
-  La méthode `create_user()` du modèle utilisateur requiert l’argument obligatoire `username`.
-  Cet argument n’était pas fourni lors du `setUp()` dans certains tests unitaires.
-- **Résolution :**
-  Spécifier systématiquement `username` lors des appels à :
+  Les tests appelaient :
   ```python
-  User.objects.create_user(...)
+  User.objects.create_user(
+      email=...,
+      password=...
+  )
   ```
+  sans fournir `username`.
+
+  Le manager par défaut hérité de Django impose `username` comme argument obligatoire :
+  ```python
+  def create_user(self, username, email=None, password=None, **extra_fields):
+      ...
+  ```
+
+  `REQUIRED_FIELDS` n’est pas la cause directe de cette erreur.
+  `REQUIRED_FIELDS` est utilisé par la commande `createsuperuser`, pas par la signature de `UserManager.create_user()`.
+- **Diagnostic :**
+  ```bash
+  rg -n "REQUIRED_FIELDS|def create_user" .
+  ```
+- **Résolution :**
+  Fournir systématiquement `username` dans les appels de test :
+  ```python
+  User.objects.create_user(
+      username="testuser",
+      email="test@example.com",
+      password="StrongPassword123!"
+  )
+  ```
+
+  À terme, si la création d’utilisateur doit se faire uniquement par email, il faudra implémenter un manager personnalisé avec une signature adaptée.
 
 ---
 
@@ -111,11 +136,16 @@
   TypeError: UserManager.create_user() missing 1 required positional argument: 'username'
   ```
 - **Cause :**
-  Le modèle `CustomUser` définit :
+  Les utilisateurs de test étaient créés avec `email` et `password`, mais sans `username`.
+
+  La cause réelle vient de la signature du manager utilisateur hérité de Django :
   ```python
-  REQUIRED_FIELDS = ['username']
+  def create_user(self, username, email=None, password=None, **extra_fields):
+      ...
   ```
-  Lors de l’initialisation des utilisateurs de test dans `setUp()`, seul `email` était fourni, sans `username`.
+
+  `REQUIRED_FIELDS` n’ajoute pas un argument obligatoire à `UserManager.create_user()`.
+  Il est seulement utilisé par `createsuperuser`.
 - **Résolution :**
   Mettre à jour la création des utilisateurs dans `apps/accounts/tests.py` pour transmettre systématiquement :
   ```python
@@ -139,7 +169,7 @@
 
 ---
 
-## 9. [2026-08-11] Warnings de sécurité `check --deploy`
+## 9. [2026-08-10] Warnings de sécurité `check --deploy`
 
 - **Ticket associé :** `AUTH-034` — Durcissement CORS / HTTPS
 - **Symptômes :**
@@ -157,13 +187,30 @@
   ?: (security.W018) You should not have DEBUG set to True in deployment.
   ```
 - **Cause :**
-  La configuration Django était encore orientée développement local :
+  La commande `check --deploy` vérifie une posture de production.
+  Elle a été exécutée avec une configuration de développement :
   - `DEBUG=True`
   - `SECRET_KEY` non conforme pour la production
-  - absence des paramètres HTTPS / HSTS
+  - absence de configuration HTTPS/HSTS effective
   - cookies de session et CSRF non sécurisés
+
+  Le code de configuration n’active le durcissement production que lorsque `DEBUG=False`.
+  Lorsque `DEBUG=True`, la branche `else` désactive explicitement :
+  - `SECURE_SSL_REDIRECT`
+  - `SESSION_COOKIE_SECURE`
+  - `CSRF_COOKIE_SECURE`
+  - `SECURE_HSTS_SECONDS`
+
+  Les warnings étaient donc attendus en développement.
+  Le problème était de vouloir valider une configuration de production avec un environnement de développement.
 - **Résolution :**
-  Ajouter un bloc conditionnel dans `config/settings.py` afin d’activer les paramètres de sécurité uniquement lorsque `DEBUG=False` :
+  Valider la configuration de production dans un environnement dédié, avec :
+  - `DEBUG=False`
+  - une clé secrète forte
+  - des variables `SECURE_*` correctement définies
+  - un fichier `.env.production.local` ou un gestionnaire de secrets à jour
+
+  Dans `config/settings.py`, conserver un bloc conditionnel clair :
   ```python
   if not DEBUG:
       SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
@@ -216,17 +263,32 @@
   source .env.production.local
   set +a
   ```
+
   Le fichier `.env.production.local` contenait notamment :
   ```env
   DEBUG=False
   SECURE_SSL_REDIRECT=True
   ```
+
   Les variables d’environnement du shell sont prioritaires sur `load_dotenv()`.
-  Django utilisait donc `DEBUG=False`, ce qui activait `SECURE_SSL_REDIRECT=True`.
+  Django utilisait donc `DEBUG=False`, ce qui activait la branche production :
+  ```python
+  if not DEBUG:
+      SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", default=True)
+  ```
+
   Toutes les requêtes HTTP étaient alors redirigées vers HTTPS, renvoyant le code :
   ```txt
   301 Moved Permanently
   ```
+
+  Avec `DEBUG=True`, la branche `else` du fichier `settings.py` force au contraire :
+  ```python
+  SECURE_SSL_REDIRECT = False
+  SECURE_HSTS_SECONDS = 0
+  ```
+
+  Le problème ne venait donc pas de `DEBUG=True`, mais du fait que `DEBUG=False` avait été injecté accidentellement dans le shell courant.
 - **Résolution :**
   Nettoyer l’environnement shell courant :
   ```bash
@@ -234,10 +296,12 @@
   unset SECURE_HSTS_SECONDS SECURE_HSTS_INCLUDE_SUBDOMAINS
   unset SECURE_HSTS_PRELOAD SECURE_PROXY_SSL_HEADER
   ```
+
   Puis relancer les tests :
   ```bash
   python manage.py test
   ```
+
   Résultat après nettoyage :
   ```txt
   Ran 27 tests
@@ -261,20 +325,25 @@
   ```env
   DJANGO_SECRET_KEY=CHANGE_ME
   ```
+
   Cette valeur étant prioritaire sur le fichier `.env` local, SimpleJWT signait les tokens avec une clé trop faible.
 - **Résolution :**
-  Nettoyer la variable d’environnement shell :
+  Pour corriger l’environnement shell courant :
   ```bash
   unset DJANGO_SECRET_KEY
   ```
+
   Générer une clé secrète forte :
   ```bash
   python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
   ```
-  Puis renseigner cette valeur dans le fichier `.env` local :
-  ```env
-  DJANGO_SECRET_KEY=CLE_SECRETE_GENEREE
-  ```
+
+  Ensuite :
+  1. renseigner cette valeur dans le fichier `.env` local pour le développement ;
+  2. remplacer impérativement le placeholder dans `.env.production.local` ou dans le gestionnaire de secrets de déploiement ;
+  3. ne pas considérer la mise à jour du `.env` local comme une correction de production.
+
+  Si `.env.production.local` a déjà été partagé ou versionné avec un placeholder ou une vraie clé, la valeur doit être considérée comme compromise et remplacée.
 
 ---
 
@@ -290,17 +359,33 @@
   SECURE_HSTS_INCLUDE_SUBDOMAINS=True
   SECURE_HSTS_PRELOAD=False
   ```
-  Cela créait une configuration incohérente :
+
+  Cela créait une configuration confuse :
   - mode développement actif avec `DEBUG=True`
-  - mais comportement sécurité production activé
+  - mais variables de sécurité production présentes dans le fichier de développement
 - **Cause :**
-  Les variables de durcissement HTTPS avaient été ajoutées directement dans le fichier `.env` de développement, au lieu d’être appliquées conditionnellement par `settings.py` ou isolées dans un fichier `.env.production.local`.
+  Les variables `SECURE_*` avaient été ajoutées dans le fichier `.env` local, alors qu’elles ne sont utiles que pour la validation ou l’exécution en production.
+
+  Avec le code actuel de `settings.py`, lorsque `DEBUG=True`, la branche `else` force explicitement :
+  ```python
+  SECURE_SSL_REDIRECT = False
+  SESSION_COOKIE_SECURE = False
+  CSRF_COOKIE_SECURE = False
+  SECURE_HSTS_SECONDS = 0
+  ```
+
+  Ces variables `SECURE_*` présentes dans le `.env` local n’activaient donc pas réellement le comportement production tant que `DEBUG=True` restait effectif.
+
+  Le risque principal était :
+  - la confusion dans la lecture de la configuration ;
+  - un basculement accidentel vers `DEBUG=False` via l’environnement shell ;
+  - une future lecture non conditionnelle de ces variables dans `settings.py`.
 - **Résolution :**
   Retirer les variables `SECURE_*` du fichier `.env` local de développement.
 
   Les conserver uniquement dans :
-  - `.env.example`, pour documentation
-  - `.env.production.local`, ou variables d’environnement de déploiement, pour production
+  - `.env.example`, pour documentation ;
+  - `.env.production.local`, ou variables d’environnement de déploiement, pour production.
 
   Le bloc `if not DEBUG:` dans `settings.py` suffit à activer ces paramètres en production.
 
@@ -334,13 +419,13 @@
 
 ---
 
-## 14. [2026-08-11] Bonne pratique : tester la configuration production dans un subshell
+## 14. [2026-08-11] Bonne pratique : tester la configuration production dans un subshell fail closed
 
 - **Ticket associé :** `AUTH-034` — Durcissement CORS / HTTPS
 - **Problème évité :**
-  Charger `.env.production.local` dans le shell courant peut casser temporairement l’environnement de développement sans que l’on s’en rende compte immédiatement.
-- **Pratique recommandée :**
-  Tester la configuration production dans un subshell isolé :
+  Charger `.env.production.local` dans le shell courant peut casser temporairement l’environnement de développement.
+
+  De plus, une commande naïve comme :
   ```bash
   (
       set -a
@@ -349,11 +434,100 @@
       python manage.py check --deploy
   )
   ```
-  À la fin du subshell, les variables sont automatiquement supprimées de l’environnement courant.
+  peut valider une configuration mixte ou involontaire si :
+  - le fichier `.env.production.local` est absent ou illisible ;
+  - `source` échoue mais la commande continue ;
+  - des variables héritées du shell courant ne sont pas nettoyées avant chargement.
+- **Pratique recommandée :**
+  Tester la configuration production dans un subshell isolé et fail closed :
+  ```bash
+  (
+      set -e
+
+      # Vérifier que le fichier de configuration production est lisible.
+      test -r .env.production.local
+
+      # Refuser explicitement les placeholders de secret.
+      if grep -q '^DJANGO_SECRET_KEY=CHANGE_ME' .env.production.local; then
+          echo "Erreur : DJANGO_SECRET_KEY contient encore CHANGE_ME dans .env.production.local" >&2
+          exit 1
+      fi
+
+      # Nettoyer les variables héritées qui pourraient fausser la validation.
+      unset DEBUG DJANGO_SECRET_KEY ALLOWED_HOSTS SECURE_SSL_REDIRECT
+      unset SECURE_HSTS_SECONDS SECURE_HSTS_INCLUDE_SUBDOMAINS
+      unset SECURE_HSTS_PRELOAD SECURE_PROXY_SSL_HEADER
+
+      # Charger les variables du fichier production.
+      set -a
+      . ./.env.production.local
+      set +a
+
+      python manage.py check --deploy
+  )
+  ```
+
+  Ce subshell :
+  - s’arrête immédiatement en cas d’erreur grâce à `set -e` ;
+  - vérifie que le fichier est lisible ;
+  - refuse un secret placeholder ;
+  - nettoie les variables héritées pertinentes ;
+  - isole les variables chargées, qui disparaissent à la fin du subshell.
 
 ---
 
-## 15. [2026-08-11] Validation finale après corrections
+## 15. [2026-08-11] Contrat complet de la fonction `env_bool`
+
+- **Module concerné :** `config/settings.py`
+- **Symptômes / Recommandation :**
+  La version initiale de `env_bool` documentait uniquement les valeurs considérées comme vraies :
+  ```txt
+  Valeurs acceptées : 1, true, yes, on.
+  ```
+
+  Le comportement attendu pour :
+  - une valeur fausse ;
+  - une valeur vide ;
+  - une valeur invalide ;
+
+  n’était pas documenté explicitement.
+- **Cause :**
+  Documentation incomplète du contrat de la fonction utilitaire.
+- **Résolution :**
+  Utiliser et documenter le contrat complet suivant :
+  ```python
+  def env_bool(name: str, default: bool = False) -> bool:
+      """
+      Interprète une variable d'environnement comme booléen.
+
+      Valeurs vraies acceptées : 1, true, yes, on.
+      Valeurs fausses acceptées : 0, false, no, off.
+
+      Si la variable est absente ou vide, la valeur par défaut est retournée.
+      Si la variable contient une valeur non booléenne, une exception
+      ImproperlyConfigured est levée afin d'éviter une configuration ambiguë.
+      """
+      value = os.getenv(name)
+
+      if value is None or not value.strip():
+          return default
+
+      normalized = value.strip().lower()
+
+      if normalized in {"1", "true", "yes", "on"}:
+          return True
+
+      if normalized in {"0", "false", "no", "off"}:
+          return False
+
+      raise ImproperlyConfigured(
+          f"La variable d'environnement {name} doit être un booléen valide."
+      )
+  ```
+
+---
+
+## 16. [2026-08-11] Validation finale après corrections
 
 - **Commande exécutée :**
   ```bash
@@ -367,3 +541,5 @@
   ```
 - **Conclusion :**
   Les 27 tests passent après nettoyage de l’environnement shell et sécurisation de la configuration.
+
+  La validation de production doit désormais être faite avec un environnement isolé, sans placeholder de secret, et avec `DEBUG=False`.

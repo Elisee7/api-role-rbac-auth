@@ -8,27 +8,35 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 def env_bool(name: str, default: bool = False) -> bool:
     """
     Interprète une variable d'environnement comme booléen.
 
-    Valeurs acceptées : 1, true, yes, on.
+    Valeurs vraies acceptées : 1, true, yes, on.
+    Valeurs fausses acceptées : 0, false, no, off.
+
+    Si la variable est absente ou vide, la valeur par défaut est retournée.
+    Si la variable contient une valeur non booléenne, une exception
+    ImproperlyConfigured est levée afin d'éviter une configuration ambiguë.
     """
     value = os.getenv(name)
+
     if value is None or not value.strip():
         return default
 
     normalized = value.strip().lower()
+
     if normalized in {"1", "true", "yes", "on"}:
         return True
+
     if normalized in {"0", "false", "no", "off"}:
         return False
+
     raise ImproperlyConfigured(
         f"La variable d'environnement {name} doit être un booléen valide."
     )
-
-
 
 # Quick-start development settings - unsuitable for production 
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
