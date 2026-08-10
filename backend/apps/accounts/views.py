@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.views import TokenObtainPairView
-from apps.accounts.serializers import ( RegisterSerializer, UserSerializer, CustomTokenObtainPairSerializer, 
+from apps.accounts.serializers import ( RegisterSerializer, UserProfileUpdateSerializer, UserSerializer, CustomTokenObtainPairSerializer, 
                                        LogoutSerializer, UserAssignRoleSerializer, UserDetailSerializer,
                                        )
 from apps.roles.models import Role
@@ -80,17 +80,15 @@ class UserAssignRoleView(generics.GenericAPIView):
         target_user = get_object_or_404(User, pk=pk)
 
         # 2. Validation des données transmises
+        #    (le sérialiseur vérifie déjà l'existence du role_id)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         # 3. Récupération et assignation du rôle
+        #    (get_object_or_404 retourne un 404 propre si le rôle
+        #     venait à être supprimé entre la validation et cet appel)
         role_id = serializer.validated_data['role_id']
-        try:
-            role = Role.objects.get(id=role_id)
-        except Role.DoesNotExist:
-            raise ValidationError(
-                {"role_id": ["Le rôle spécifié n'existe pas."]}
-            )
+        role = get_object_or_404(Role, id=role_id)
         
         target_user.role = role
         target_user.save()
@@ -106,8 +104,9 @@ class UserAssignRoleView(generics.GenericAPIView):
 
 class UserMeView(generics.RetrieveUpdateAPIView):
     """
-    AUTH-023: Permet à l'utilisateur authentifié de récupérer (GET) 
-    et de mettre à jour partiellement (PATCH) son propre profil.
+    Endpoint : GET / PATCH /api/users/me/
+    Permet à l'utilisateur authentifié de consulter et de modifier son profil.
+    Exige un Access Token valide.
     """
     http_method_names = ["get", "patch", "head", "options"]
     permission_classes = [permissions.IsAuthenticated]
@@ -116,3 +115,11 @@ class UserMeView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         # Récupère directement l'utilisateur lié au Token JWT
         return self.request.user
+
+    def get_serializer_class(self):
+        """
+        Sélectionne le sérialiseur adapté selon la méthode HTTP.
+        """
+        if self.request.method in ['PATCH', 'PUT']:
+            return UserProfileUpdateSerializer
+        return UserDetailSerializer

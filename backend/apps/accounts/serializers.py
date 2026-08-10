@@ -149,7 +149,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'username', 'role', 'is_active', 'date_joined')
+        fields = ('id', 'email', 'username','first_name', 'last_name', 'role', 'is_active', 'date_joined')
         read_only_fields = fields
 
 class UserMeSerializer(serializers.ModelSerializer):
@@ -170,3 +170,21 @@ class UserMeSerializer(serializers.ModelSerializer):
         ]
         # Sécurité : Seuls first_name et last_name sont modifiables par l'utilisateur courant.
         read_only_fields = ['id', 'email', 'role', 'is_active', 'date_joined']
+
+class UserProfileUpdateSerializer(serializers.ModelSerializer):
+    """
+    Sérialiseur permettant à un utilisateur de mettre à jour son propre profil.
+    Les champs sensibles (email, role, is_staff, etc.) sont exclus du champ d'édition.
+    """
+    class Meta:
+        model = User
+        fields = ('first_name', 'last_name', 'username')
+
+    def validate_username(self, value):
+        """
+        Vérifie l'unicité du nom d'utilisateur si celui-ci est modifié.
+        """
+        user = self.context['request'].user
+        if User.objects.exclude(pk=user.pk).filter(username=value).exists():
+            raise serializers.ValidationError("Ce nom d'utilisateur est déjà utilisé.")
+        return value

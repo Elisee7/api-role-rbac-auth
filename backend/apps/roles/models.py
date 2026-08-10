@@ -30,7 +30,7 @@ class Role(models.Model):
     permissions = models.ManyToManyField('Permission', related_name='roles', blank=True)
 
     created_at = models.DateTimeField(default=timezone.now)
-    updated_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name

@@ -319,3 +319,40 @@ class UserMeTests(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.content, b'')  # Le corps de la réponse doit être vide
+
+class UserMeAPITestCase(APITestCase):
+    """
+    Suite de tests pour la consultation et mise à jour de son propre profil (AUTH-023).
+    """
+    def setUp(self):
+        self.user_role = Role.objects.create(name='USER', description='Utilisateur standard')
+        self.user = User.objects.create_user(
+            email="me@example.com",
+            username="meuser",
+            password="StrongPassword123!",
+            role=self.user_role,
+            first_name="John",
+            last_name="Doe"
+        )
+        self.url = reverse('user-me')
+
+    def test_get_profile_success(self):
+        """Vérifie qu'un utilisateur authentifié récupère ses informations."""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['email'], self.user.email)
+
+    def test_patch_profile_success(self):
+        """Vérifie la mise à jour partielle des informations du profil."""
+        self.client.force_authenticate(user=self.user)
+        payload = {"first_name": "Jane"}
+        response = self.client.patch(self.url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Jane")
+
+    def test_unauthenticated_profile_access_denied(self):
+        """Vérifie le rejet (401) d'un utilisateur non connecté."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

@@ -34,7 +34,7 @@ INSTALLED_APPS = [
     # Local apps
     'apps.accounts',
     'apps.api',
-    'apps.core',
+    # 'apps.core',
     'apps.roles',
 
     # Apps tiers
