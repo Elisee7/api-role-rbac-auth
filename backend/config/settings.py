@@ -8,7 +8,17 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+
+"""
+Chargement des variables d'environnement locales (.env).
+
+En production (ou lors de la validation de la configuration production), 
+les variables doivent être fournies exclusivement par l'environnement d'exécution.
+Cela évite qu'un fichier .env local ne comble silencieusement des variables 
+manquantes en production, ce qui créerait une configuration mixte et dangereuse.
+"""
+if os.getenv("DJANGO_ENV", "development") != "production":
+    load_dotenv(BASE_DIR / ".env")
 
 def env_bool(name: str, default: bool = False) -> bool:
     """

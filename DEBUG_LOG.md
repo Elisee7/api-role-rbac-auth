@@ -431,7 +431,7 @@
       set -a
       source .env.production.local
       set +a
-      python manage.py check --deploy
+      python manage.py check --deploy --fail-level WARNING
   )
   ```
   peut valider une configuration mixte ou involontaire si :
@@ -447,11 +447,65 @@
       # Vérifier que le fichier de configuration production est lisible.
       test -r .env.production.local
 
-      # Refuser explicitement les placeholders de secret.
-      if grep -q '^DJANGO_SECRET_KEY=CHANGE_ME' .env.production.local; then
-          echo "Erreur : DJANGO_SECRET_KEY contient encore CHANGE_ME dans .env.production.local" >&2
-          exit 1
-      fi
+      (
+    set -euo pipefail
+
+    ENV_FILE=".env.production.local"
+
+    # Vérifier que le fichier de configuration production est lisible.
+    test -r "$ENV_FILE"
+
+    # Nettoyer les variables héritées qui pourraient fausser la validation.
+    unset DEBUG DJANGO_SECRET_KEY ALLOWED_HOSTS SECURE_SSL_REDIRECT
+    unset SECURE_HSTS_SECONDS SECURE_HSTS_INCLUDE_SUBDOMAINS
+    unset SECURE_HSTS_PRELOAD SECURE_PROXY_SSL_HEADER
+
+    # Indiquer explicitement à settings.py de ne PAS charger le .env local
+    export DJANGO_ENV="production"
+
+    # Charger les variables du fichier production.
+    set -a
+    . "$ENV_FILE"
+    set +a
+
+    # Valider la valeur effectivement parsée et exposée à Django.
+    python - <<'PY'
+import os
+import sys
+
+secret = os.getenv("DJANGO_SECRET_KEY", "")
+
+# Nettoyage des espaces et d'éventuels guillemets résiduels.
+secret = secret.strip().strip("'\"")
+
+if not secret:
+    sys.exit("Erreur : DJANGO_SECRET_KEY est absente.")
+
+normalized = secret.upper()
+
+if (
+    "CHANGE_ME" in normalized
+    or "CHANGEME" in normalized
+    or "PLACEHOLDER" in normalized
+):
+    sys.exit(
+        "Erreur : DJANGO_SECRET_KEY contient encore un placeholder "
+        "dans .env.production.local."
+    )
+
+if len(secret) < 50:
+    sys.exit(
+        "Erreur : DJANGO_SECRET_KEY doit contenir au moins 50 caractères."
+    )
+
+if len(set(secret)) < 5:
+    sys.exit(
+        "Erreur : DJANGO_SECRET_KEY manque d'entropie."
+    )
+PY
+
+    python manage.py check --deploy
+)
 
       # Nettoyer les variables héritées qui pourraient fausser la validation.
       unset DEBUG DJANGO_SECRET_KEY ALLOWED_HOSTS SECURE_SSL_REDIRECT
