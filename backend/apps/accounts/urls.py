@@ -9,6 +9,7 @@ from apps.accounts.views import (
     CustomTokenObtainPairView,
     LogoutView,
     UserAssignRoleView,
+    UserMeView,
 )
 
 urlpatterns = [
@@ -17,5 +18,6 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='auth-refresh'),
     path('auth/logout/', LogoutView.as_view(), name='auth-logout'),
     path('users/<int:pk>/assign-role/', UserAssignRoleView.as_view(), name='user-assign-role'),
+    path('users/me/', UserMeView.as_view(), name='user-me'),
 ]
 

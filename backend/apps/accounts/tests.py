@@ -255,3 +255,51 @@ class UserAssignRoleTestCase(APITestCase):
         response = self.client.post(url, {'role_id': 9999})
         
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+class UserMeTests(APITestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="testuser",
+            email="testuser@example.com",
+            password="Password123!",
+            first_name="John",
+            last_name="Doe"
+        )
+        self.url = reverse('user-me')
+
+    def test_get_user_me_authenticated(self):
+        """Vérifie la récupération du profil pour un utilisateur connecté."""
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['email'], self.user.email)
+        self.assertEqual(response.data['first_name'], "John")
+
+    def test_get_user_me_unauthenticated(self):
+        """Vérifie qu'un accès non authentifié retourne 401 Unauthorized."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_patch_user_me_success(self):
+        """Vérifie la mise à jour partielle des champs autorisés (first_name, last_name)."""
+        self.client.force_authenticate(user=self.user)
+        payload = {"first_name": "Jane", "last_name": "Smith"}
+        response = self.client.patch(self.url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Jane")
+        self.assertEqual(self.user.last_name, "Smith")
+
+    def test_patch_user_me_cannot_change_readonly_fields(self):
+        """Vérifie qu'un utilisateur ne peut pas modifier son email ou son rôle via ce flux."""
+        self.client.force_authenticate(user=self.user)
+        payload = {"email": "hacked@example.com"}
+        response = self.client.patch(self.url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        # L'email ne doit pas avoir changé
+        self.assertEqual(self.user.email, "testuser@example.com")

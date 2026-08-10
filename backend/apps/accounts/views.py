@@ -13,6 +13,7 @@ from apps.accounts.serializers import ( RegisterSerializer, UserSerializer, Cust
                                        )
 from apps.roles.models import Role
 from apps.roles.permissions import HasRolePermission
+from apps.accounts.serializers import UserMeSerializer
 
 User = get_user_model()
 
@@ -103,3 +104,14 @@ class UserAssignRoleView(generics.GenericAPIView):
             status=status.HTTP_200_OK
         )
 
+class UserMeView(generics.RetrieveUpdateAPIView):
+    """
+    AUTH-023: Permet à l'utilisateur authentifié de récupérer (GET) 
+    et de mettre à jour partiellement (PATCH) son propre profil.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UserMeSerializer
+
+    def get_object(self):
+        # Récupère directement l'utilisateur lié au Token JWT
+        return self.request.user

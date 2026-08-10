@@ -151,3 +151,22 @@ class UserDetailSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'email', 'username', 'role', 'is_active', 'date_joined')
         read_only_fields = fields
+
+class UserMeSerializer(serializers.ModelSerializer):
+    """
+    Serializer pour l'endpoint GET / PATCH /api/v1/accounts/users/me/
+    Permet à l'utilisateur de modifier ses infos personnelles de base sans toucher à ses accès.
+    """
+    class Meta:
+        model = User
+        fields = [
+            'id', 
+            'email', 
+            'first_name', 
+            'last_name', 
+            'role', 
+            'is_active', 
+            'date_joined'
+        ]
+        # Sécurité : Seuls first_name et last_name sont modifiables par l'utilisateur courant.
+        read_only_fields = ['id', 'email', 'role', 'is_active', 'date_joined']
