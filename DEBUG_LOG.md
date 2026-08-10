@@ -505,19 +505,7 @@ if len(set(secret)) < 5:
 PY
 
     python manage.py check --deploy
-)
-
-      # Nettoyer les variables héritées qui pourraient fausser la validation.
-      unset DEBUG DJANGO_SECRET_KEY ALLOWED_HOSTS SECURE_SSL_REDIRECT
-      unset SECURE_HSTS_SECONDS SECURE_HSTS_INCLUDE_SUBDOMAINS
-      unset SECURE_HSTS_PRELOAD SECURE_PROXY_SSL_HEADER
-
-      # Charger les variables du fichier production.
-      set -a
-      . ./.env.production.local
-      set +a
-
-      python manage.py check --deploy
+  )
   )
   ```
 

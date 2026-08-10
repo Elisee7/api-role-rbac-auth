@@ -21,8 +21,8 @@ DJANGO_ENV = os.getenv("DJANGO_ENV")
 if not DJANGO_ENV:
     raise ImproperlyConfigured(
         "DJANGO_ENV est absent. "
-        "Le point d'entrée de production doit définir DJANGO_ENV=production "
-        "avant l'import de settings.py."
+        "Le point d'entrée doit définir DJANGO_ENV=development ou "
+        "DJANGO_ENV=production avant l'import de settings.py."
     )
 
 if DJANGO_ENV == "production":
