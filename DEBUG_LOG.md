@@ -36,7 +36,7 @@
 
 ## [2026-08-10] Fix: TypeError create_user() et Restriction HTTP 405 sur AUTH-023
 
-**Ticket associé :** `AUTH-023` (Profil utilisateur `/api/v1/accounts/users/me/`)
+**Ticket associé :** `AUTH-023` (Profil utilisateur `/api/users/me/`)
 
 ### 1. Problème : Argument `username` manquant dans les tests unitaires
 * **Symptômes :** 
