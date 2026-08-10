@@ -1,35 +1,36 @@
-"""
-Fichier : apps/roles/permissions.py
-Description : Classes de permission DRF pour le contrôle d'accès basé sur les rôles (RBAC).
-"""
 from rest_framework import permissions
-
 
 class HasRolePermission(permissions.BasePermission):
     """
-    Permission DRF dynamique qui vérifie si le rôle de l'utilisateur détient
-    la permission requise définie au niveau de la vue (attribut `required_permission`).
+    Permission DRF réutilisable basée sur le rôle de l'utilisateur et les codes de permissions associées.
     """
+    message = "Vous n'avez pas la permission requise pour effectuer cette action."
 
     def has_permission(self, request, view):
-        # 1. Vérification de l'authentification de l'utilisateur
+        # 1. Vérifier si l'utilisateur est connecté
         if not request.user or not request.user.is_authenticated:
             return False
 
-        # Les superutilisateurs (is_superuser) conservent tous les accès d'administration
+        # 2. Les superutilisateurs (admins) contournent le contrôle de rôle
         if request.user.is_superuser:
             return True
 
-        # 2. Récupération de la permission requise définie dans la vue
+        # 3. Récupérer la permission exigée par la vue (ex: required_permission = 'roles.manage')
         required_permission = getattr(view, 'required_permission', None)
 
-        # Si aucune permission spécifique n'est exigée par la vue, l'accès est accordé à tout utilisateur authentifié
+        # Si la vue ne spécifie pas de permission requise, l'accès est accordé à tout utilisateur authentifié
         if not required_permission:
             return True
 
-        # 3. Vérification si l'utilisateur a un rôle associé
+        # 4. L'utilisateur doit posséder un rôle
         if not request.user.role:
+            self.message = "Aucun rôle n'est attribué à votre compte."
             return False
 
-        # 4. Vérification si le rôle contient le code de permission requis
-        return request.user.role.has_permission(required_permission)
+        # 5. Vérifier si le rôle possède le code de permission demandé
+        has_perm = request.user.role.has_permission(required_permission)
+
+        if not has_perm:
+            self.message = f"Permission requise manquante : '{required_permission}'."
+
+        return has_perm
