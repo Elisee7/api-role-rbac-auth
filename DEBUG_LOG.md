@@ -461,12 +461,12 @@
     unset SECURE_HSTS_PRELOAD SECURE_PROXY_SSL_HEADER
 
     # Indiquer explicitement à settings.py de ne PAS charger le .env local
-    export DJANGO_ENV="production"
 
     # Charger les variables du fichier production.
     set -a
     . "$ENV_FILE"
     set +a
+    export DJANGO_ENV="production"
 
     # Valider la valeur effectivement parsée et exposée à Django.
     python - <<'PY'

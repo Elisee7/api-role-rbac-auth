@@ -17,8 +17,25 @@ les variables doivent être fournies exclusivement par l'environnement d'exécut
 Cela évite qu'un fichier .env local ne comble silencieusement des variables 
 manquantes en production, ce qui créerait une configuration mixte et dangereuse.
 """
-if os.getenv("DJANGO_ENV", "development") != "production":
+DJANGO_ENV = os.getenv("DJANGO_ENV")
+if not DJANGO_ENV:
+    raise ImproperlyConfigured(
+        "DJANGO_ENV est absent. "
+        "Le point d'entrée de production doit définir DJANGO_ENV=production "
+        "avant l'import de settings.py."
+    )
+
+if DJANGO_ENV == "production":
+    # En production, ne pas charger .env local
+    pass
+elif DJANGO_ENV == "development":
+    # En développement, charger le .env local
     load_dotenv(BASE_DIR / ".env")
+else:
+    raise ImproperlyConfigured(
+        f"Valeur DJANGO_ENV invalide: {DJANGO_ENV!r}. "
+        "Attendu: 'development' ou 'production'."
+    )
 
 def env_bool(name: str, default: bool = False) -> bool:
     """
