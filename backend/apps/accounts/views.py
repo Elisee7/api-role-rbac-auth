@@ -84,7 +84,12 @@ class UserAssignRoleView(generics.GenericAPIView):
 
         # 3. Récupération et assignation du rôle
         role_id = serializer.validated_data['role_id']
-        role = Role.objects.get(id=role_id)
+        try:
+            role = Role.objects.get(id=role_id)
+        except Role.DoesNotExist:
+            raise ValidationError(
+                {"role_id": ["Le rôle spécifié n'existe pas."]}
+            )
         
         target_user.role = role
         target_user.save()
