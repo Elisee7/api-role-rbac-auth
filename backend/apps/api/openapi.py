@@ -43,7 +43,7 @@ RESPONSE_400_BAD_REQUEST = OpenApiResponse(
     examples=[
         OpenApiExample(
             "Champ invalide",
-            value={"password": ["Ce mot de passe est trop court."]},
+            value={"field_name": ["Ce champ est invalide."]},
         ),
     ],
 )

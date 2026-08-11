@@ -35,6 +35,11 @@ _ERRORS_WRITE = {
     400: RESPONSE_400_BAD_REQUEST,
     401: RESPONSE_401_UNAUTHORIZED,
     403: RESPONSE_403_FORBIDDEN,
+}
+
+# Variante pour les opérations sur un item (update, partial_update, delete)
+_ERRORS_WRITE_ITEM = {
+    **_ERRORS_WRITE,
     404: RESPONSE_404_NOT_FOUND,
 }
 

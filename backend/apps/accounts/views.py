@@ -43,6 +43,7 @@ class RegisterView(APIView):
     # AUTH-031 : enrichissement du schéma OpenAPI.
     @extend_schema(
         tags=["Auth"],
+        auth=[],
         summary="Inscription d'un nouvel utilisateur",
         description=(
             "Crée un compte avec un email unique et un mot de passe conforme "
@@ -63,6 +64,7 @@ class RegisterView(APIView):
                     "username": "janedoe",
                     "password": "StrongPassword123!",
                 },
+                request_only=True,
             ),
             # Exemple RÉPONSE (status_codes → appliqué à la sortie 201)
             OpenApiExample(
@@ -127,6 +129,7 @@ class RegisterView(APIView):
                     "email": "jane.doe@example.com",
                     "password": "StrongPassword123!",
                 },
+                request_only=True,
             ),
             # Exemple RÉPONSE 200 (status_codes → appliqué à la sortie 200)
             OpenApiExample(
@@ -200,6 +203,7 @@ class LogoutView(APIView):
                 value={
                     "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 },
+                request_only=True,
             ),
             # Exemple RÉPONSE 200 : confirmation de déconnexion
             OpenApiExample(
@@ -272,6 +276,7 @@ class UserAssignRoleView(generics.GenericAPIView):
             OpenApiExample(
                 "Requête valide",
                 value={"role_id": 2},
+                request_only=True,
             ),
             # Exemple RÉPONSE 200 : rôle assigné + profil à jour
             OpenApiExample(
@@ -302,12 +307,14 @@ class UserAssignRoleView(generics.GenericAPIView):
                         "date_joined": "2026-08-11T09:00:00Z",
                     },
                 },
+                request_only=True,
                 status_codes=["200"],
             ),
             # Exemple RÉPONSE 400 : role_id inexistant (validate_role_id)
             OpenApiExample(
                 "Rôle inexistant",
                 value={"role_id": ["Le rôle spécifié n'existe pas."]},
+                request_only=True,
                 status_codes=["400"],
             ),
         ],
@@ -416,6 +423,7 @@ class UserAssignRoleView(generics.GenericAPIView):
                     "first_name": "Jane",
                     "last_name": "Smith",
                 },
+                request_only=True,
             ),
             # Exemple RÉPONSE 200 : profil mis à jour
             OpenApiExample(
@@ -492,6 +500,7 @@ class UserMeView(generics.RetrieveUpdateAPIView):
                 value={
                     "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 },
+                request_only=True,
             ),
             # Exemple RÉPONSE 200 (status_codes → appliqué à la sortie 200)
             OpenApiExample(
@@ -500,6 +509,7 @@ class UserMeView(generics.RetrieveUpdateAPIView):
                     "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                     "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 },
+                request_only=True,
                 status_codes=["200"],
             ),
         ],

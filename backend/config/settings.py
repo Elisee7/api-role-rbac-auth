@@ -23,7 +23,7 @@ def resolve_environment() -> str:
 
     # Si DJANGO_ENV n'est pas déjà fourni par l'environnement du processus,
     # on consulte seulement la valeur DJANGO_ENV du fichier .env local.
-    if not env_value:
+    if env_value is None:
         env_file = BASE_DIR / ".env"
 
         if env_file.is_file():

@@ -78,8 +78,9 @@ set -a
 source .env.production.local
 set +a
 
-#Vérifier si je n'ai pas de variables de production chargées dans ton shell courant
-env | grep -E "DEBUG|DJANGO_SECRET_KEY|SECURE_|ALLOWED_HOSTS"
+# Vérifier qu'aucune variable de production n'est chargée dans le shell courant
+# (on n'affiche que les noms, jamais les valeurs)
+env | cut -d= -f1 | grep -E "DEBUG|DJANGO_SECRET_KEY|SECURE_|ALLOWED_HOSTS"
 
 # Nettoyer toutes les variables du .env.production.local
 unset DEBUG DJANGO_SECRET_KEY ALLOWED_HOSTS SECURE_SSL_REDIRECT

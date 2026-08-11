@@ -58,11 +58,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
               examples:
-                IdentifiantsValides:
-                  value:
-                    email: jane.doe@example.com
-                    password: StrongPassword123!
-                  summary: Identifiants valides
                 ConnexionRéussie:
                   value:
                     access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -137,10 +132,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/DetailResponse'
               examples:
-                RequêteValide:
-                  value:
-                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-                  summary: Requête valide
                 DéconnexionRéussie:
                   value:
                     detail: Déconnexion réussie. Le token a été révoqué.
@@ -160,8 +151,8 @@ paths:
                   summary: Refresh token invalide
                 ChampInvalide:
                   value:
-                    password:
-                    - Ce mot de passe est trop court.
+                    field_name:
+                    - Ce champ est invalide.
                   summary: Champ invalide
           description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
         '401':
@@ -215,16 +206,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TokenRefreshResponse'
-              examples:
-                RefreshTokenValide:
-                  value:
-                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-                  summary: Refresh token valide
-                RotationRéussie:
-                  value:
-                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-                  summary: Rotation réussie
           description: ''
         '401':
           content:
@@ -274,9 +255,6 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
         required: true
-      security:
-      - jwtAuth: []
-      - {}
       responses:
         '201':
           content:
@@ -284,12 +262,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
               examples:
-                RequêteValide:
-                  value:
-                    email: jane.doe@example.com
-                    username: janedoe
-                    password: StrongPassword123!
-                  summary: Requête valide
                 Réponse201:
                   value:
                     id: 1
@@ -310,8 +282,8 @@ paths:
               examples:
                 ChampInvalide:
                   value:
-                    password:
-                    - Ce mot de passe est trop court.
+                    field_name:
+                    - Ce champ est invalide.
                   summary: Champ invalide
           description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
   /api/permissions/:
@@ -563,8 +535,8 @@ paths:
               examples:
                 ChampInvalide:
                   value:
-                    password:
-                    - Ce mot de passe est trop court.
+                    field_name:
+                    - Ce champ est invalide.
                   summary: Champ invalide
           description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
         '401':
@@ -589,16 +561,6 @@ paths:
                     detail: 'Permission requise manquante : ''roles.manage''.'
                   summary: Permission manquante
           description: 'Accès refusé : permission insuffisante pour ce rôle.'
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetailResponse'
-              examples:
-                Introuvable:
-                  value:
-                    detail: Not found.
-          description: Ressource introuvable.
   /api/roles/{id}/:
     get:
       operationId: roles_retrieve
@@ -697,8 +659,8 @@ paths:
               examples:
                 ChampInvalide:
                   value:
-                    password:
-                    - Ce mot de passe est trop court.
+                    field_name:
+                    - Ce champ est invalide.
                   summary: Champ invalide
           description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
         '401':
@@ -723,16 +685,6 @@ paths:
                     detail: 'Permission requise manquante : ''roles.manage''.'
                   summary: Permission manquante
           description: 'Accès refusé : permission insuffisante pour ce rôle.'
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetailResponse'
-              examples:
-                Introuvable:
-                  value:
-                    detail: Not found.
-          description: Ressource introuvable.
     patch:
       operationId: roles_partial_update
       description: Met à jour partiellement les champs d'un rôle. Réservé aux administrateurs.
@@ -775,8 +727,8 @@ paths:
               examples:
                 ChampInvalide:
                   value:
-                    password:
-                    - Ce mot de passe est trop court.
+                    field_name:
+                    - Ce champ est invalide.
                   summary: Champ invalide
           description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
         '401':
@@ -801,16 +753,6 @@ paths:
                     detail: 'Permission requise manquante : ''roles.manage''.'
                   summary: Permission manquante
           description: 'Accès refusé : permission insuffisante pour ce rôle.'
-        '404':
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DetailResponse'
-              examples:
-                Introuvable:
-                  value:
-                    detail: Not found.
-          description: Ressource introuvable.
     delete:
       operationId: roles_destroy
       description: Supprime un rôle. Les utilisateurs associés auront leur champ role
@@ -947,51 +889,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AssignRoleResponse'
-              examples:
-                RequêteValide:
-                  value:
-                    role_id: 2
-                  summary: Requête valide
-                RôleAssigné:
-                  value:
-                    message: Rôle 'MANAGER' assigné avec succès à l'utilisateur 'targetuser'.
-                    user:
-                      id: 3
-                      email: target@example.com
-                      username: targetuser
-                      first_name: ''
-                      last_name: ''
-                      role:
-                        id: 2
-                        name: MANAGER
-                        description: Gestionnaire
-                        permissions:
-                        - 1
-                        - 2
-                        - 5
-                        - 6
-                        permissions_detail:
-                        - id: 1
-                          code: users.read
-                          description: Consulter la liste/détails des utilisateurs
-                          created_at: '2026-08-05T00:00:00Z'
-                        - id: 2
-                          code: users.write
-                          description: Créer et modifier des utilisateurs
-                          created_at: '2026-08-05T00:00:00Z'
-                        - id: 5
-                          code: profile.read
-                          description: Consulter son propre profil
-                          created_at: '2026-08-05T00:00:00Z'
-                        - id: 6
-                          code: profile.write
-                          description: Modifier son propre profil
-                          created_at: '2026-08-05T00:00:00Z'
-                        created_at: '2026-08-05T00:00:00Z'
-                        updated_at: '2026-08-05T00:00:00Z'
-                      is_active: true
-                      date_joined: '2026-08-11T09:00:00Z'
-                  summary: Rôle assigné
           description: ''
         '400':
           content:
@@ -1000,15 +897,10 @@ paths:
                 type: object
                 additionalProperties: {}
               examples:
-                RôleInexistant:
-                  value:
-                    role_id:
-                    - Le rôle spécifié n'existe pas.
-                  summary: Rôle inexistant
                 ChampInvalide:
                   value:
-                    password:
-                    - Ce mot de passe est trop court.
+                    field_name:
+                    - Ce champ est invalide.
                   summary: Champ invalide
           description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
         '401':
@@ -1145,11 +1037,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserProfileUpdate'
               examples:
-                MiseÀJourDuNom:
-                  value:
-                    first_name: Jane
-                    last_name: Smith
-                  summary: Mise à jour du nom
                 ProfilMisÀJour:
                   value:
                     first_name: Jane
@@ -1171,8 +1058,8 @@ paths:
                   summary: Username déjà utilisé
                 ChampInvalide:
                   value:
-                    password:
-                    - Ce mot de passe est trop court.
+                    field_name:
+                    - Ce champ est invalide.
                   summary: Champ invalide
           description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
         '401':
