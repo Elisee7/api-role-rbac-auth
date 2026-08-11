@@ -9,6 +9,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from apps.roles.models import Role
 from apps.roles.serializers import RoleSerializer
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 
 User = get_user_model()
@@ -48,14 +49,24 @@ class RegisterSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
-        # Instanciation d'un utilisateur candidat en mémoire pour valider la similitude d'attributs
+        """
+        Validation globale du sérialiseur.
+        Instancie un utilisateur candidat en mémoire pour permettre
+        à UserAttributeSimilarityValidator de comparer le mot de passe
+        aux attributs (email, username, etc.).
+        Les erreurs sont associées au champ 'password' pour une réponse
+        API structurée par champ (meilleure intégration frontend).
+        """
         candidate_user = User(
             email=attrs.get('email', ''),
             username=attrs.get('username', ''),
             first_name=attrs.get('first_name', ''),
             last_name=attrs.get('last_name', ''),
         )
-        validate_password(attrs['password'], candidate_user)
+        try:
+            validate_password(attrs['password'], candidate_user)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'password': exc.messages})
         return attrs
 
     def create(self, validated_data):

@@ -4,11 +4,12 @@ from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from apps.roles.models import Role, Permission
 from rest_framework_simplejwt.state import token_backend
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from django.core.cache import cache
 from unittest import mock
 from rest_framework.throttling import ScopedRateThrottle
-
+from rest_framework_simplejwt.exceptions import TokenError
+from datetime import timedelta
 
 User = get_user_model()
 
@@ -18,9 +19,15 @@ class RegisterAPITestCase(APITestCase):
     Test 1 du Cahier des Charges : Verification de l'inscription d'un utilisateur.
     """
     def setUp(self):
+        super().setUp()
+        cache.clear()
         # Pré-création du rôle USER pour l'attribution automatique
         self.user_role = Role.objects.create(name='USER', description='Utilisateur standard')
         self.register_url = reverse('auth-register')
+
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
 
     def test_user_registration_success(self):
         """
@@ -52,6 +59,8 @@ class LoginAPITestCase(APITestCase):
     Test 2 du Cahier des Charges : Connexion et émission des tokens JWT.
     """
     def setUp(self):
+        super().setUp()
+        cache.clear()
         self.user_role = Role.objects.create(name='USER', description='Utilisateur standard')
         self.email = "loginuser@example.com"
         self.password = "StrongPassword123!"
@@ -62,6 +71,10 @@ class LoginAPITestCase(APITestCase):
             role=self.user_role
         )
         self.login_url = reverse('auth-login')
+
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
 
     def test_login_success(self):
         """
@@ -103,6 +116,8 @@ class TokenRefreshAPITestCase(APITestCase):
     Test 3 du Cahier des Charges : Rafraîchissement du token JWT et rotation.
     """
     def setUp(self):
+        super().setUp()
+        cache.clear()
         self.user_role = Role.objects.create(name='USER', description='Utilisateur standard')
         self.email = "refreshuser@example.com"
         self.password = "StrongPassword123!"
@@ -122,6 +137,10 @@ class TokenRefreshAPITestCase(APITestCase):
         }, format='json')
         self.initial_refresh = response.data['refresh']
         self.initial_access = response.data['access']
+
+        def tearDown(self):
+            cache.clear()
+            super().tearDown()
 
     def test_token_refresh_success_and_rotation(self):
         """
@@ -164,6 +183,8 @@ class LogoutTests(APITestCase):
     """
 
     def setUp(self):
+        super().setUp()
+        cache.clear()
         """
         Initialisation de l'utilisateur de test et génération directe des tokens JWT.
         """
@@ -180,6 +201,10 @@ class LogoutTests(APITestCase):
         self.refresh_token = str(refresh)
 
         self.logout_url = reverse('auth-logout')
+
+        def tearDown(self):
+            cache.clear()
+            super().tearDown()
 
     def test_logout_success(self):
         """
@@ -429,3 +454,83 @@ class AuthRateLimitingTestCase(APITestCase):
         # La requête suivante doit être bloquée par le rate limiting.
         response = self.client.post(url, payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+class RegisterValidationTestCase(APITestCase):
+    """
+    Tests complémentaires (CDC §10) sur la validation à l'inscription :
+    - rejet d'un mot de passe faible ;
+    - rejet d'un email déjà existant.
+    """
+
+    def setUp(self):
+        """Pré-création du rôle USER requis par RegisterSerializer."""
+        Role.objects.create(name='USER', description='Utilisateur standard')
+        self.register_url = reverse('auth-register')
+
+    def test_register_weak_password_rejected(self):
+        """
+        Vérifie qu'un mot de passe trop faible (ex: '123') est rejeté
+        avec un statut 400 et un message d'erreur explicite.
+        """
+        data = {
+            "email": "weak@example.com",
+            "username": "weakuser",
+            "password": "123",
+        }
+        response = self.client.post(self.register_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # validate_password() est appelé dans validate() global du sérialiseur,
+        # les erreurs sont donc dans non_field_errors.
+        self.assertIn('password', response.data)
+
+    def test_register_duplicate_email_rejected(self):
+        """
+        Vérifie qu'une inscription avec un email déjà existant
+        est rejetée avec un statut 400.
+        """
+        # Premier utilisateur
+        User.objects.create_user(
+            email="existing@example.com",
+            username="existinguser",
+            password="StrongPassword123!",
+        )
+        # Tentative de doublon
+        data = {
+            "email": "existing@example.com",
+            "username": "anotheruser",
+            "password": "StrongPassword123!",
+        }
+        response = self.client.post(self.register_url, data, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+
+class AccessTokenExpiryTestCase(APITestCase):
+    """
+    Test complémentaire (CDC §10) : expiration de l'access token.
+    Vérifie qu'un access token expiré est rejeté avec un statut 401.
+    """
+
+    def setUp(self):
+        """Création d'un utilisateur pour générer un token expiré."""
+        self.user = User.objects.create_user(
+            username="expiryuser",
+            email="expiry@example.com",
+            password="StrongPassword123!",
+        )
+        self.url = reverse('user-me')
+
+    def test_expired_access_token_rejected(self):
+        """
+        Génère un access token avec une durée de vie négative
+        (déjà expiré) et vérifie que l'API répond 401.
+        """
+        token = AccessToken.for_user(self.user)
+        token.set_exp(lifetime=timedelta(minutes=-1))
+        expired_access = str(token)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {expired_access}'
+        )
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
