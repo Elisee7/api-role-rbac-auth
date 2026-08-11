@@ -202,9 +202,9 @@ class LogoutTests(APITestCase):
 
         self.logout_url = reverse('auth-logout')
 
-        def tearDown(self):
-            cache.clear()
-            super().tearDown()
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
 
     def test_logout_success(self):
         """
