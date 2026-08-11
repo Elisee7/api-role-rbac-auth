@@ -1,4 +1,6 @@
 # Environnement et secrets (ne jamais versionner)
+.env
+.env.*
 backend/.env
 backend/.env*
 gen_context.py
@@ -22,7 +24,6 @@ staticfiles/
 htmlcov/
 
 # Environnement virtuel & secrets
-.env
 venv/
 .venv/
 

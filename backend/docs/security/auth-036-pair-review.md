@@ -19,7 +19,7 @@ n'a pas couvert ou a pu sous-estimer.
 | Gravité | Nombre | Détail |
 |---------|-------:|--------|
 | Bloquant | 0 | — |
-| Majeur | 2 | Cache rate limiting (prod), absence .gitignore |
+| Majeur | 1 | Cache rate limiting (prod) |
 | Mineur | 2 | Claim "role" figé, CORS vs ADR 001 |
 
 ---
@@ -48,23 +48,7 @@ et ajouter `django-redis` aux dépendances de production.
 
 ---
 
-### 3.2 [MAJEUR] Absence de fichier `.gitignore`
-
-**Constat :**
-Aucun `.gitignore` n'apparaît dans l'arborescence. Le fichier
-`backend/.env` contient des credentials (`DJANGO_SECRET_KEY`,
-`DB_PASSWORD=7000`). S'il est versionné, ces secrets sont exposés.
-
-**Impact :** Fuite de credentials dans l'historique Git.
-
-**Recommandation (action immédiate) :**
-Créer un `.gitignore` excluant `.env` et tout fichier de secrets.
-Si `.env` a déjà été commité, le considérer comme compromis et
-régénérer les secrets.
-
----
-
-### 3.3 [MINEUR] Claim "role" figé dans le JWT
+### 3.2 [MINEUR] Claim "role" figé dans le JWT
 
 **Constat :**
 `CustomTokenObtainPairSerializer.get_token()` injecte le rôle dans
@@ -80,7 +64,7 @@ Acceptable en l'état.
 
 ---
 
-### 3.4 [MINEUR] Incohérence `CORS_ALLOW_CREDENTIALS` vs ADR 001
+### 3.3 [MINEUR] Incohérence `CORS_ALLOW_CREDENTIALS` vs ADR 001
 
 **Constat :**
 `settings.py` définit `CORS_ALLOW_CREDENTIALS = False`. Or l'ADR 001
@@ -107,7 +91,7 @@ applicable en l'état.
 | Hachage mots de passe | PBKDF2 via Django, jamais en clair | ✅ Conforme |
 | Rotation + blacklist | `ROTATE_REFRESH_TOKENS` + `BLACKLIST_AFTER_ROTATION` actifs | ✅ Conforme |
 | Rate limiting présent | `throttle_scope = "auth"` sur register/login/refresh/logout | ✅ Présent |
-| Longueur clé secrète | 50 caractères (> 32 requis pour HS256) | ✅ Conforme |
+| Longueur clé secrète | `DJANGO_SECRET_KEY` doit mesurer au moins 32 octets (256 bits) après encodage UTF-8 ; vérifier `len(secret.encode('utf-8')) >= 32` et que la clé est générée aléatoirement (ex. `get_random_secret_key()`) sans jamais exposer la valeur | ✅ Conforme |
 | `SECURE_PROXY_SSL_HEADER` conditionnel | Activé uniquement si variable explicite | ✅ Conforme |
 | Headers sécurité Django 6 | `Content-Type nosniff`, `X-Frame DENY`, `Referrer-Policy` par défaut | ✅ Conforme |
 
@@ -117,10 +101,9 @@ applicable en l'état.
 
 | # | Action | Priorité | Échéance |
 |---|--------|----------|----------|
-| 1 | Créer `.gitignore` (exclure `.env`, secrets) | Immédiate | AUTH-036 |
-| 2 | Configurer cache partagé (Redis) pour rate limiting | Haute | Sprint 5 (AUTH-041) |
-| 3 | Documenter limitation claim "role" dans ADR 001 | Basse | Clôture |
-| 4 | Clarifier CORS vs cookie httpOnly dans ADR 001 | Basse | Clôture |
+| 1 | Configurer cache partagé (Redis) pour rate limiting | Haute | Sprint 5 (AUTH-041) |
+| 2 | Documenter limitation claim "role" dans ADR 001 | Basse | Clôture |
+| 3 | Clarifier CORS vs cookie httpOnly dans ADR 001 | Basse | Clôture |
 
 ---
 
@@ -135,3 +118,8 @@ applicable en l'état.
 > **Rappel :** Le point 1 est un **prérequis bloquant** pour AUTH-041.
 > Les points 2 et 3 sont des actions de documentation à intégrer
 > dans la rédaction du rapport de fin de projet (AUTH-045).
+>
+> **Note historique validée :** le dépôt contient déjà un `.gitignore` racine,
+> et `backend/.env` n'est pas suivi par Git. Le constat "absence de `.gitignore`"
+> correspond donc à un état antérieur, et il n'est plus comptabilisé comme
+> constat majeur actif.

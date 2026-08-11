@@ -41,12 +41,12 @@ API REST sécurisée d'authentification JWT (access + refresh) et de gestion des
 
 ```bash
 # 1. Cloner le dépôt
-git clone <url-du-repo> p1_v4_1_api_auth
+git clone https://github.com/Elisee7/api-role-rbac-auth.git
 cd p1_v4_1_api_auth/backend
 
 # 2. Créer et activer un environnement virtuel
 python -m venv venv
-source venv/bin/activate        # Windows : venv\Scripts\activate
+source venv/bin/activate        # Windows : venv\Scripts\activate.bat
 
 # 3. Installer les dépendances
 pip install -r requirements.txt
@@ -68,7 +68,7 @@ cp .env.example .env
 | `DEBUG` | Mode debug (`True` uniquement en développement) | `True` |
 | `DJANGO_SECRET_KEY` | Clé secrète (≥ 50 caractères, jamais commitée) | — |
 | `ALLOWED_HOSTS` | Hôtes autorisés (séparés par virgule) | `localhost,127.0.0.1` |
-| `CORS_ALLOWED_ORIGINS` | Origines CORS autorisées | `http://localhost:3000` |
+| `CORS_ALLOWED_ORIGINS` | Origines CORS autorisées (**obligatoire en production**) | `http://localhost:3000` (dev) / `https://mondomaine.com` (prod) |
 | `DB_ENGINE` | Moteur de base de données | `django.db.backends.postgresql` |
 | `DB_NAME` | Nom de la base | `auth_roles_db` |
 | `DB_USER` | Utilisateur PostgreSQL | `postgres` |
@@ -76,6 +76,8 @@ cp .env.example .env
 | `DB_HOST` | Hôte PostgreSQL | `localhost` |
 | `DB_PORT` | Port PostgreSQL | `5432` |
 | `THROTTLE_AUTH_RATE` | Limite de débit des endpoints auth | `10/minute` |
+
+> **⚠️ Production** : `CORS_ALLOWED_ORIGINS` doit contenir au moins une origine HTTPS valide. Une valeur vide déclenche une erreur `ImproperlyConfigured` au démarrage.
 
 Générer une clé secrète forte :
 
@@ -206,6 +208,7 @@ La suite couvre les 5 scénarios critiques du cahier des charges :
 - **ADR 001** — Architecture et politique des jetons JWT : `backend/docs/adr/001-architecture-jwt.md`
 - **Matrice rôles / permissions** : `backend/docs/roles-permissions-matrix.md`
 - **Revue sécurité OWASP** : `backend/docs/security/auth-032-owasp-api-top10.md`
+- **Audit croisé de sécurité (pair review)** : `backend/docs/security/auth-036-pair-review.md`
 - **Journal de débogage** : `DEBUG_LOG.md`
 
 ---
