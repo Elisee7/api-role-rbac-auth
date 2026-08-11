@@ -82,4 +82,4 @@ Revue statique du code source, de la configuration et de la suite de tests autom
 # apps/accounts/views.py — UserMeView
 def get_object(self):
     # Récupère directement l'utilisateur lié au Token JWT
-    return self.request.user 
+    return self.request.user
