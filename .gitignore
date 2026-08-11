@@ -1,8 +1,10 @@
+# Environnement et secrets (ne jamais versionner)
 backend/.env
 backend/.env*
 gen_context.py
 context.txt
 updated_file.txt
+
 
 # Keep the example file
 !backend/.env.example
@@ -13,6 +15,11 @@ __pycache__/
 *.sqlite3
 media/
 staticfiles/
+*.log
+
+# Couverture de tests
+.coverage
+htmlcov/
 
 # Environnement virtuel & secrets
 .env
