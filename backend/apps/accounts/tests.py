@@ -138,9 +138,9 @@ class TokenRefreshAPITestCase(APITestCase):
         self.initial_refresh = response.data['refresh']
         self.initial_access = response.data['access']
 
-        def tearDown(self):
-            cache.clear()
-            super().tearDown()
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
 
     def test_token_refresh_success_and_rotation(self):
         """
@@ -463,9 +463,16 @@ class RegisterValidationTestCase(APITestCase):
     """
 
     def setUp(self):
+        super().setUp()
+        cache.clear()
         """Pré-création du rôle USER requis par RegisterSerializer."""
         Role.objects.create(name='USER', description='Utilisateur standard')
         self.register_url = reverse('auth-register')
+
+    def tearDown(self):
+        """Nettoie le cache après chaque test."""
+        cache.clear()
+        super().tearDown()
 
     def test_register_weak_password_rejected(self):
         """
@@ -479,8 +486,8 @@ class RegisterValidationTestCase(APITestCase):
         }
         response = self.client.post(self.register_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        # validate_password() est appelé dans validate() global du sérialiseur,
-        # les erreurs sont donc dans non_field_errors.
+        # validate_password() est appelé dans validate() global du sérialiseur.
+        # Les erreurs sont retournées sous le champ password.
         self.assertIn('password', response.data)
 
     def test_register_duplicate_email_rejected(self):
@@ -512,6 +519,8 @@ class AccessTokenExpiryTestCase(APITestCase):
     """
 
     def setUp(self):
+        super().setUp()
+        cache.clear()
         """Création d'un utilisateur pour générer un token expiré."""
         self.user = User.objects.create_user(
             username="expiryuser",
@@ -519,6 +528,11 @@ class AccessTokenExpiryTestCase(APITestCase):
             password="StrongPassword123!",
         )
         self.url = reverse('user-me')
+
+    def tearDown(self):
+        """Nettoie le cache après chaque test."""
+        cache.clear()
+        super().tearDown()
 
     def test_expired_access_token_rejected(self):
         """
