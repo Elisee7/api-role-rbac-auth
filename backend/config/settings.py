@@ -296,7 +296,6 @@ CORS_ALLOW_CREDENTIALS = False
 
 """
 Durcissement de sécurité pour la production.
-
 Ces réglages sont activés uniquement lorsque DEBUG=False.
 Ils ne doivent pas être utilisés tels quels en développement local HTTP,
 car ils peuvent casser l'accès local (redirection HTTPS, cookies secure, etc.).
@@ -325,6 +324,19 @@ if not DEBUG:
     # Django doit pouvoir détecter le protocole original via X-Forwarded-Proto.
     if env_bool("SECURE_PROXY_SSL_HEADER", default=False):
         SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+    # En production, CORS_ALLOWED_ORIGINS doit être explicitement configuré.
+    if not CORS_ALLOWED_ORIGINS:
+        raise ImproperlyConfigured(
+            "CORS_ALLOWED_ORIGINS est obligatoire en production."
+        )
+else:
+    # En développement, désactive explicitement les paramètres de sécurité
+    # pour éviter tout comportement inattendu (cf. DEBUG_LOG entrée 9 & 10).
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "API Auth + Roles",

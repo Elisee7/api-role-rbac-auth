@@ -585,3 +585,28 @@ PY
   Les 27 tests passent après nettoyage de l’environnement shell et sécurisation de la configuration.
 
   La validation de production doit désormais être faite avec un environnement isolé, sans placeholder de secret, et avec `DEBUG=False`.
+
+  ---
+## 17. [2026-08-12] Finitions AUTH-034 : bloc `else` développement et validation CORS production
+- **Ticket associé :** `AUTH-034` — Durcissement CORS / HTTPS
+- **Symptômes :**
+  1. Le bloc conditionnel `if not DEBUG:` dans `settings.py` n'avait pas de
+     branche `else` explicite. En cas de variable `SECURE_*` injectée
+     accidentellement dans l'environnement, le comportement en développement
+     pouvait être ambigu.
+  2. `CORS_ALLOWED_ORIGINS` n'était pas validé en production : une variable
+     vide produisait silencieusement une liste vide sans erreur explicite.
+- **Résolution :**
+  1. Ajout d'un bloc `else` qui force explicitement :
+     - `SECURE_SSL_REDIRECT = False`
+     - `SESSION_COOKIE_SECURE = False`
+     - `CSRF_COOKIE_SECURE = False`
+     - `SECURE_HSTS_SECONDS = 0`
+  2. Ajout d'une vérification fail-closed en production :
+     ```python
+     if not CORS_ALLOWED_ORIGINS:
+         raise ImproperlyConfigured(
+             "CORS_ALLOWED_ORIGINS est obligatoire en production."
+         )
+     ```
+- **Validation :** `python manage.py test` → OK
