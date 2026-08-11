@@ -5,6 +5,10 @@ from django.contrib.auth import get_user_model
 from apps.roles.models import Role, Permission
 from rest_framework_simplejwt.state import token_backend
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.cache import cache
+from unittest import mock
+from rest_framework.throttling import ScopedRateThrottle
+
 
 User = get_user_model()
 
@@ -320,39 +324,108 @@ class UserMeTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.content, b'')  # Le corps de la réponse doit être vide
 
-class UserMeAPITestCase(APITestCase):
+# ---------------------------------------------------------------------------
+# AUTH-033 : tests de rate limiting sur les endpoints sensibles.
+#
+# Objectif :
+# - vérifier que /api/auth/login/ renvoie 429 après dépassement de la limite ;
+# - vérifier que /api/auth/refresh/ renvoie 429 après dépassement de la limite.
+#
+# Important :
+# `override_settings(REST_FRAMEWORK=...)` n'est pas suffisant ici, car DRF
+# charge les limites de throttling dans l'attribut de classe
+# `SimpleRateThrottle.THROTTLE_RATES` au moment de l'import du module.
+# On patch donc directement la classe `ScopedRateThrottle` utilisée par les vues.
+# ---------------------------------------------------------------------------
+
+# Nombre maximal de requêtes autorisées pendant la fenêtre de test.
+TEST_AUTH_RATE_LIMIT = 3
+
+# Valeur de rate limiting utilisée uniquement pour les tests.
+TEST_AUTH_RATE = f"{TEST_AUTH_RATE_LIMIT}/minute"
+
+
+@mock.patch.object(
+    ScopedRateThrottle,
+    "THROTTLE_RATES",
+    {"auth": TEST_AUTH_RATE},
+)
+class AuthRateLimitingTestCase(APITestCase):
     """
-    Suite de tests pour la consultation et mise à jour de son propre profil (AUTH-023).
+    Suite de tests pour AUTH-033.
+
+    Vérifie que les endpoints d'authentification sensibles renvoient :
+    - 401 tant que la limite de débit n'est pas dépassée ;
+    - 429 lorsque la limite de débit est dépassée.
+
+    Les endpoints testés sont :
+    - POST /api/auth/login/
+    - POST /api/auth/refresh/
     """
+
     def setUp(self):
-        self.user_role = Role.objects.create(name='USER', description='Utilisateur standard')
-        self.user = User.objects.create_user(
-            email="me@example.com",
-            username="meuser",
-            password="StrongPassword123!",
-            role=self.user_role,
-            first_name="John",
-            last_name="Doe"
-        )
-        self.url = reverse('user-me')
+        """
+        Nettoie le cache avant chaque test.
 
-    def test_get_profile_success(self):
-        """Vérifie qu'un utilisateur authentifié récupère ses informations."""
-        self.client.force_authenticate(user=self.user)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['email'], self.user.email)
+        DRF utilise le cache pour stocker les compteurs de throttling.
+        Ce nettoyage évite qu'un test précédent ne fausse le résultat.
+        """
+        super().setUp()
+        cache.clear()
 
-    def test_patch_profile_success(self):
-        """Vérifie la mise à jour partielle des informations du profil."""
-        self.client.force_authenticate(user=self.user)
-        payload = {"first_name": "Jane"}
-        response = self.client.patch(self.url, payload, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.user.refresh_from_db()
-        self.assertEqual(self.user.first_name, "Jane")
+    def tearDown(self):
+        """
+        Nettoie le cache après chaque test afin de ne pas polluer
+        les tests suivants avec des compteurs de throttling résiduels.
+        """
+        cache.clear()
+        super().tearDown()
 
-    def test_unauthenticated_profile_access_denied(self):
-        """Vérifie le rejet (401) d'un utilisateur non connecté."""
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+    def test_login_rate_limit_returns_429(self):
+        """
+        Vérifie que /api/auth/login/ est protégé contre le brute force.
+
+        Scénario :
+        1. On envoie plusieurs tentatives de connexion invalides.
+        2. Tant que la limite n'est pas atteinte, l'API répond 401.
+        3. Une fois la limite dépassée, l'API répond 429.
+        """
+        url = reverse('auth-login')
+
+        payload = {
+            "email": "unknown@example.com",
+            "password": "WrongPassword123!",
+        }
+
+        # Les premières requêtes doivent être refusées pour identifiants invalides.
+        for _ in range(TEST_AUTH_RATE_LIMIT):
+            response = self.client.post(url, payload, format='json')
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # La requête suivante doit être bloquée par le rate limiting.
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_refresh_rate_limit_returns_429(self):
+        """
+        Vérifie que /api/auth/refresh/ est protégé contre l'abus de requêtes.
+
+        Scénario :
+        1. On envoie plusieurs refresh tokens invalides.
+        2. Tant que la limite n'est pas atteinte, l'API répond 401.
+        3. Une fois la limite dépassée, l'API répond 429.
+        """
+        url = reverse('auth-refresh')
+
+        payload = {
+            "refresh": "invalid.token.string",
+        }
+
+        # Les premières requêtes doivent être refusées pour token invalide.
+        for _ in range(TEST_AUTH_RATE_LIMIT):
+            response = self.client.post(url, payload, format='json')
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        # La requête suivante doit être bloquée par le rate limiting.
+        response = self.client.post(url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)

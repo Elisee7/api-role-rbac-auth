@@ -80,3 +80,23 @@ RESPONSE_404_NOT_FOUND = OpenApiResponse(
         OpenApiExample("Introuvable", value={"detail": "Not found."}),
     ],
 )
+
+# ---------------------------------------------------------------------------
+# 429 : trop de requêtes.
+# Réponse renvoyée lorsque la limite de débit configurée pour le scope
+# d'authentification est dépassée (AUTH-033).
+# La valeur réelle est pilotée par la variable d'environnement
+# THROTTLE_AUTH_RATE, afin de ne pas la coder en dur.
+# ---------------------------------------------------------------------------
+RESPONSE_429_TOO_MANY_REQUESTS = OpenApiResponse(
+    response=DetailResponse,
+    description=(
+        "Trop de requêtes : la limite de débit autorisée est dépassée."
+    ),
+    examples=[
+        OpenApiExample(
+            "Limite dépassée",
+            value={"detail": "Request was throttled."},
+        ),
+    ],
+)

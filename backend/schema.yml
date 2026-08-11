@@ -87,6 +87,17 @@ paths:
                     detail: Given token not valid for any token type
                   summary: Token invalide
           description: 'Non authentifié : token absent, invalide ou expiré.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                LimiteDépassée:
+                  value:
+                    detail: Request was throttled.
+                  summary: Limite dépassée
+          description: 'Trop de requêtes : la limite de débit autorisée est dépassée.'
   /api/auth/logout/:
     post:
       operationId: auth_logout_create
@@ -166,6 +177,17 @@ paths:
                     detail: Given token not valid for any token type
                   summary: Token invalide
           description: 'Non authentifié : token absent, invalide ou expiré.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                LimiteDépassée:
+                  value:
+                    detail: Request was throttled.
+                  summary: Limite dépassée
+          description: 'Trop de requêtes : la limite de débit autorisée est dépassée.'
   /api/auth/refresh/:
     post:
       operationId: auth_refresh_create
@@ -218,6 +240,17 @@ paths:
                     detail: Given token not valid for any token type
                   summary: Token invalide
           description: 'Non authentifié : token absent, invalide ou expiré.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                LimiteDépassée:
+                  value:
+                    detail: Request was throttled.
+                  summary: Limite dépassée
+          description: 'Trop de requêtes : la limite de débit autorisée est dépassée.'
   /api/auth/register/:
     post:
       operationId: auth_register_create
@@ -286,6 +319,17 @@ paths:
                     - Ce champ est invalide.
                   summary: Champ invalide
           description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                LimiteDépassée:
+                  value:
+                    detail: Request was throttled.
+                  summary: Limite dépassée
+          description: 'Trop de requêtes : la limite de débit autorisée est dépassée.'
   /api/permissions/:
     get:
       operationId: permissions_list

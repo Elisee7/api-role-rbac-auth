@@ -26,6 +26,7 @@ from apps.api.openapi import (
     RESPONSE_401_UNAUTHORIZED,
     RESPONSE_403_FORBIDDEN,
     RESPONSE_404_NOT_FOUND,
+    RESPONSE_429_TOO_MANY_REQUESTS,
     DetailResponse,
 )
 
@@ -54,6 +55,7 @@ class RegisterView(APIView):
         responses={
             201: UserSerializer,
             400: RESPONSE_400_BAD_REQUEST,
+            429: RESPONSE_429_TOO_MANY_REQUESTS,
         },
         examples=[
             # Exemple REQUÊTE (pas de status_codes → appliqué au body d'entrée)
@@ -120,6 +122,7 @@ class RegisterView(APIView):
                 },
             ),
             401: RESPONSE_401_UNAUTHORIZED,
+            429: RESPONSE_429_TOO_MANY_REQUESTS,
         },
         examples=[
             # Exemple REQUÊTE (pas de status_codes → appliqué au body d'entrée)
@@ -195,6 +198,7 @@ class LogoutView(APIView):
             200: DetailResponse,
             400: RESPONSE_400_BAD_REQUEST,
             401: RESPONSE_401_UNAUTHORIZED,
+            429: RESPONSE_429_TOO_MANY_REQUESTS,
         },
         examples=[
             # Exemple REQUÊTE (pas de status_codes → appliqué au body d'entrée)
@@ -492,6 +496,7 @@ class UserMeView(generics.RetrieveUpdateAPIView):
                 },
             ),
             401: RESPONSE_401_UNAUTHORIZED,
+            429: RESPONSE_429_TOO_MANY_REQUESTS,
         },
         examples=[
             # Exemple REQUÊTE (pas de status_codes → appliqué au body d'entrée)
