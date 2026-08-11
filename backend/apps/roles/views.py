@@ -101,13 +101,13 @@ _ERRORS_WRITE_ITEM = {
         tags=["Roles"],
         summary="Modifier un rôle (remplacement complet)",
         description="Remplace l'ensemble des champs d'un rôle. Réservé aux administrateurs.",
-        responses={200: RoleSerializer, **_ERRORS_WRITE},
+        responses={200: RoleSerializer, **_ERRORS_WRITE_ITEM},
     ),
     partial_update=extend_schema(
         tags=["Roles"],
         summary="Modifier un rôle (partiel)",
         description="Met à jour partiellement les champs d'un rôle. Réservé aux administrateurs.",
-        responses={200: RoleSerializer, **_ERRORS_WRITE},
+        responses={200: RoleSerializer, **_ERRORS_WRITE_ITEM},
     ),
     destroy=extend_schema(
         tags=["Roles"],

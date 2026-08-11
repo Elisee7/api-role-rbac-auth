@@ -685,6 +685,16 @@ paths:
                     detail: 'Permission requise manquante : ''roles.manage''.'
                   summary: Permission manquante
           description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
     patch:
       operationId: roles_partial_update
       description: Met à jour partiellement les champs d'un rôle. Réservé aux administrateurs.
@@ -753,6 +763,16 @@ paths:
                     detail: 'Permission requise manquante : ''roles.manage''.'
                   summary: Permission manquante
           description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
     delete:
       operationId: roles_destroy
       description: Supprime un rôle. Les utilisateurs associés auront leur champ role
