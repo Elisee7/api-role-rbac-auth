@@ -1,41 +1,57 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 from django.core.exceptions import ImproperlyConfigured
-
-# Charger les variables d'environnement depuis .env
-load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-"""
-Chargement des variables d'environnement locales (.env).
+def resolve_environment() -> str:
+    """
+    Résout l'environnement d'exécution sans charger aveuglément le fichier .env.
 
-En production (ou lors de la validation de la configuration production), 
-les variables doivent être fournies exclusivement par l'environnement d'exécution.
-Cela évite qu'un fichier .env local ne comble silencieusement des variables 
-manquantes en production, ce qui créerait une configuration mixte et dangereuse.
-"""
-DJANGO_ENV = os.getenv("DJANGO_ENV")
-if not DJANGO_ENV:
-    raise ImproperlyConfigured(
-        "DJANGO_ENV est absent. "
-        "Le point d'entrée doit définir DJANGO_ENV=development ou "
-        "DJANGO_ENV=production avant l'import de settings.py."
-    )
+    Règles :
+    - La variable d'environnement DJANGO_ENV du processus est prioritaire.
+    - Si elle est absente, on lit uniquement DJANGO_ENV dans .env via dotenv_values(),
+      sans injecter les autres variables du fichier dans l'environnement.
+    - Si l'environnement est 'development', le fichier .env local peut être chargé.
+    - Si l'environnement est 'production', le fichier .env local ne doit pas être chargé.
+      Les variables de production doivent provenir de l'environnement d'exécution
+      ou d'un fichier de configuration production chargé volontairement.
+    """
+    env_value = os.getenv("DJANGO_ENV")
 
-if DJANGO_ENV == "production":
-    # En production, ne pas charger .env local
-    pass
-elif DJANGO_ENV == "development":
-    # En développement, charger le .env local
-    load_dotenv(BASE_DIR / ".env")
-else:
-    raise ImproperlyConfigured(
-        f"Valeur DJANGO_ENV invalide: {DJANGO_ENV!r}. "
-        "Attendu: 'development' ou 'production'."
-    )
+    # Si DJANGO_ENV n'est pas déjà fourni par l'environnement du processus,
+    # on consulte seulement la valeur DJANGO_ENV du fichier .env local.
+    if not env_value:
+        env_file = BASE_DIR / ".env"
+
+        if env_file.is_file():
+            env_value = dotenv_values(env_file).get("DJANGO_ENV")
+
+    if not env_value:
+        raise ImproperlyConfigured(
+            "DJANGO_ENV est absent. "
+            "Définissez DJANGO_ENV=development ou DJANGO_ENV=production."
+        )
+
+    normalized = env_value.strip().lower()
+
+    if normalized not in {"development", "production"}:
+        raise ImproperlyConfigured(
+            f"Valeur DJANGO_ENV invalide : {env_value!r}. "
+            "Attendu : 'development' ou 'production'."
+        )
+
+    return normalized
+
+
+DJANGO_ENV = resolve_environment()
+
+# Chargement complet du fichier .env local uniquement en développement.
+if DJANGO_ENV == "development":
+    load_dotenv(BASE_DIR / ".env", override=False)
+
 
 def env_bool(name: str, default: bool = False) -> bool:
     """
@@ -277,11 +293,6 @@ CORS_ALLOWED_ORIGINS = [
 # En développement, on peut autoriser explicitement des origines locales.
 # En production, la variable CORS_ALLOWED_ORIGINS doit être définie.
 CORS_ALLOW_CREDENTIALS = False
-
-"""
-Durcissement de sécurité pour la production.
-Ces réglages ne doivent pas être actifs en développement local.
-"""
 
 """
 Durcissement de sécurité pour la production.

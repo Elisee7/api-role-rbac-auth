@@ -55,6 +55,9 @@ python manage.py check
 
 # Vérifier les configurations pour le déploiement
 python manage.py check --deploy
+
+# Génération et validation du schéma OpenAPI
+python manage.py spectacular --file schema.yml --validate
 ```
 
 ## Authentification JWT
@@ -74,6 +77,9 @@ python manage.py loaddata initial_roles
 set -a
 source .env.production.local
 set +a
+
+#Vérifier si je n'ai pas de variables de production chargées dans ton shell courant
+env | grep -E "DEBUG|DJANGO_SECRET_KEY|SECURE_|ALLOWED_HOSTS"
 
 # Nettoyer toutes les variables du .env.production.local
 unset DEBUG DJANGO_SECRET_KEY ALLOWED_HOSTS SECURE_SSL_REDIRECT

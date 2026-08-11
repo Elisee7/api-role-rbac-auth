@@ -1,0 +1,1572 @@
+openapi: 3.0.3
+info:
+  title: API Auth + Roles
+  version: 1.0.0
+  description: API d'authentification JWT avec gestion des rôles et permissions. Conforme
+    au cahier des charges Auth + Roles v1.0.
+paths:
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: Authentifie l'utilisateur via son email et son mot de passe, puis
+        retourne un couple access token / refresh token ainsi que le profil utilisateur.
+        Le rôle est injecté dans le payload du token (claim 'role').
+      summary: Connexion — émission des tokens JWT
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+            examples:
+              IdentifiantsValides:
+                value:
+                  email: jane.doe@example.com
+                  password: StrongPassword123!
+                summary: Identifiants valides
+              ConnexionRéussie:
+                value:
+                  access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  user:
+                    id: 1
+                    email: jane.doe@example.com
+                    username: janedoe
+                    first_name: ''
+                    last_name: ''
+                    role: USER
+                    date_joined: '2026-08-11T09:00:00Z'
+                summary: Connexion réussie
+              IdentifiantsInvalides:
+                value:
+                  detail: No active account found with the given credentials
+                summary: Identifiants invalides
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              examples:
+                IdentifiantsValides:
+                  value:
+                    email: jane.doe@example.com
+                    password: StrongPassword123!
+                  summary: Identifiants valides
+                ConnexionRéussie:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    user:
+                      id: 1
+                      email: jane.doe@example.com
+                      username: janedoe
+                      first_name: ''
+                      last_name: ''
+                      role: USER
+                      date_joined: '2026-08-11T09:00:00Z'
+                  summary: Connexion réussie
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                IdentifiantsInvalides:
+                  value:
+                    detail: No active account found with the given credentials
+                  summary: Identifiants invalides
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+  /api/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      description: Invalide le refresh token fourni en l'ajoutant à la liste noire
+        (blacklist). Exige un Access Token valide dans l'en-tête Authorization (Bearer
+        <token>). Une fois révoqué, ce refresh token ne peut plus servir à rafraîchir
+        la session.
+      summary: Déconnexion — révocation du refresh token
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+            examples:
+              RequêteValide:
+                value:
+                  refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                summary: Requête valide
+              DéconnexionRéussie:
+                value:
+                  detail: Déconnexion réussie. Le token a été révoqué.
+                summary: Déconnexion réussie
+              RefreshTokenInvalide:
+                value:
+                  refresh:
+                  - Token invalide ou déjà révoqué.
+                summary: Refresh token invalide
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                RequêteValide:
+                  value:
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  summary: Requête valide
+                DéconnexionRéussie:
+                  value:
+                    detail: Déconnexion réussie. Le token a été révoqué.
+                  summary: Déconnexion réussie
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                RefreshTokenInvalide:
+                  value:
+                    refresh:
+                    - Token invalide ou déjà révoqué.
+                  summary: Refresh token invalide
+                ChampInvalide:
+                  value:
+                    password:
+                    - Ce mot de passe est trop court.
+                  summary: Champ invalide
+          description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+  /api/auth/refresh/:
+    post:
+      operationId: auth_refresh_create
+      description: 'Émet un nouvel access token à partir d''un refresh token valide.
+        La rotation est activée : un nouveau refresh token est retourné et l''ancien
+        est immédiatement invalidé (blacklist). Un refresh token révoqué, expiré ou
+        invalide est rejeté avec un statut 401.'
+      summary: Rafraîchissement des tokens JWT (avec rotation)
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+            examples:
+              RefreshTokenValide:
+                value:
+                  refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                summary: Refresh token valide
+              RotationRéussie:
+                value:
+                  access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                summary: Rotation réussie
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefreshResponse'
+              examples:
+                RefreshTokenValide:
+                  value:
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  summary: Refresh token valide
+                RotationRéussie:
+                  value:
+                    access: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                    refresh: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                  summary: Rotation réussie
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+  /api/auth/register/:
+    post:
+      operationId: auth_register_create
+      description: Crée un compte avec un email unique et un mot de passe conforme
+        à la politique de sécurité. Le rôle par défaut 'USER' est attribué automatiquement.
+      summary: Inscription d'un nouvel utilisateur
+      tags:
+      - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              RequêteValide:
+                value:
+                  email: jane.doe@example.com
+                  username: janedoe
+                  password: StrongPassword123!
+                summary: Requête valide
+              Réponse201:
+                value:
+                  id: 1
+                  email: jane.doe@example.com
+                  username: janedoe
+                  first_name: ''
+                  last_name: ''
+                  role: USER
+                  date_joined: '2026-08-11T09:00:00Z'
+                summary: Réponse 201
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              examples:
+                RequêteValide:
+                  value:
+                    email: jane.doe@example.com
+                    username: janedoe
+                    password: StrongPassword123!
+                  summary: Requête valide
+                Réponse201:
+                  value:
+                    id: 1
+                    email: jane.doe@example.com
+                    username: janedoe
+                    first_name: ''
+                    last_name: ''
+                    role: USER
+                    date_joined: '2026-08-11T09:00:00Z'
+                  summary: Réponse 201
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ChampInvalide:
+                  value:
+                    password:
+                    - Ce mot de passe est trop court.
+                  summary: Champ invalide
+          description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
+  /api/permissions/:
+    get:
+      operationId: permissions_list
+      description: Retourne la liste de toutes les permissions disponibles dans le
+        système. Réservé aux administrateurs (permission 'roles.manage').
+      summary: Lister les permissions
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Permission'
+              examples:
+                ListeDePermissions:
+                  value:
+                  - id: 4
+                    code: roles.manage
+                    description: Gérer les rôles et permissions
+                    created_at: '2026-08-05T00:00:00Z'
+                  summary: Liste de permissions
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+  /api/permissions/{id}/:
+    get:
+      operationId: permissions_retrieve
+      description: Retourne le détail d'une permission par son identifiant. Réservé
+        aux administrateurs.
+      summary: Détail d'une permission
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) Permission.
+        required: true
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Permission'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
+  /api/roles/:
+    get:
+      operationId: roles_list
+      description: Retourne la liste de tous les rôles applicatifs. Réservé aux administrateurs
+        (permission 'roles.manage').
+      summary: Lister les rôles
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+    post:
+      operationId: roles_create
+      description: Crée un nouveau rôle avec ses permissions associées. Réservé aux
+        administrateurs.
+      summary: Créer un rôle
+      tags:
+      - Roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+            examples:
+              CréationDuRôleMANAGER:
+                value:
+                  name: MANAGER
+                  description: Gestionnaire
+                  permissions:
+                  - 1
+                  - 2
+                  - 5
+                  - 6
+                summary: Création du rôle MANAGER
+              RôleCréé:
+                value:
+                  id: 2
+                  name: MANAGER
+                  description: Gestionnaire
+                  permissions:
+                  - 1
+                  - 2
+                  - 5
+                  - 6
+                  permissions_detail:
+                  - id: 1
+                    code: users.read
+                    description: Consulter la liste/détails des utilisateurs
+                    created_at: '2026-08-05T00:00:00Z'
+                  - id: 2
+                    code: users.write
+                    description: Créer et modifier des utilisateurs
+                    created_at: '2026-08-05T00:00:00Z'
+                  created_at: '2026-08-11T09:00:00Z'
+                  updated_at: '2026-08-11T09:00:00Z'
+                summary: Rôle créé
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+              examples:
+                CréationDuRôleMANAGER:
+                  value:
+                    name: MANAGER
+                    description: Gestionnaire
+                    permissions:
+                    - 1
+                    - 2
+                    - 5
+                    - 6
+                  summary: Création du rôle MANAGER
+                RôleCréé:
+                  value:
+                    id: 2
+                    name: MANAGER
+                    description: Gestionnaire
+                    permissions:
+                    - 1
+                    - 2
+                    - 5
+                    - 6
+                    permissions_detail:
+                    - id: 1
+                      code: users.read
+                      description: Consulter la liste/détails des utilisateurs
+                      created_at: '2026-08-05T00:00:00Z'
+                    - id: 2
+                      code: users.write
+                      description: Créer et modifier des utilisateurs
+                      created_at: '2026-08-05T00:00:00Z'
+                    created_at: '2026-08-11T09:00:00Z'
+                    updated_at: '2026-08-11T09:00:00Z'
+                  summary: Rôle créé
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ChampInvalide:
+                  value:
+                    password:
+                    - Ce mot de passe est trop court.
+                  summary: Champ invalide
+          description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
+  /api/roles/{id}/:
+    get:
+      operationId: roles_retrieve
+      description: Retourne le détail d'un rôle par son identifiant. Réservé aux administrateurs.
+      summary: Détail d'un rôle
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) role.
+        required: true
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
+    put:
+      operationId: roles_update
+      description: Remplace l'ensemble des champs d'un rôle. Réservé aux administrateurs.
+      summary: Modifier un rôle (remplacement complet)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) role.
+        required: true
+      tags:
+      - Roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RoleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ChampInvalide:
+                  value:
+                    password:
+                    - Ce mot de passe est trop court.
+                  summary: Champ invalide
+          description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
+    patch:
+      operationId: roles_partial_update
+      description: Met à jour partiellement les champs d'un rôle. Réservé aux administrateurs.
+      summary: Modifier un rôle (partiel)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) role.
+        required: true
+      tags:
+      - Roles
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRoleRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRoleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRoleRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                ChampInvalide:
+                  value:
+                    password:
+                    - Ce mot de passe est trop court.
+                  summary: Champ invalide
+          description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
+    delete:
+      operationId: roles_destroy
+      description: Supprime un rôle. Les utilisateurs associés auront leur champ role
+        mis à null (on_delete=SET_NULL). Réservé aux administrateurs.
+      summary: Supprimer un rôle
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un(une) valeur entière unique identifiant ce(cette) role.
+        required: true
+      tags:
+      - Roles
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
+  /api/users/{id}/assign-role/:
+    post:
+      operationId: users_assign_role_create
+      description: Attribue un rôle à l'utilisateur cible identifié par son id. Réservé
+        aux administrateurs (permission 'roles.manage'). La réponse contient un message
+        de confirmation ainsi que le profil mis à jour de l'utilisateur cible.
+      summary: Assigner un rôle à un utilisateur
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserAssignRoleRequest'
+            examples:
+              RequêteValide:
+                value:
+                  role_id: 2
+                summary: Requête valide
+              RôleAssigné:
+                value:
+                  message: Rôle 'MANAGER' assigné avec succès à l'utilisateur 'targetuser'.
+                  user:
+                    id: 3
+                    email: target@example.com
+                    username: targetuser
+                    first_name: ''
+                    last_name: ''
+                    role:
+                      id: 2
+                      name: MANAGER
+                      description: Gestionnaire
+                      permissions:
+                      - 1
+                      - 2
+                      - 5
+                      - 6
+                      permissions_detail:
+                      - id: 1
+                        code: users.read
+                        description: Consulter la liste/détails des utilisateurs
+                        created_at: '2026-08-05T00:00:00Z'
+                      - id: 2
+                        code: users.write
+                        description: Créer et modifier des utilisateurs
+                        created_at: '2026-08-05T00:00:00Z'
+                      - id: 5
+                        code: profile.read
+                        description: Consulter son propre profil
+                        created_at: '2026-08-05T00:00:00Z'
+                      - id: 6
+                        code: profile.write
+                        description: Modifier son propre profil
+                        created_at: '2026-08-05T00:00:00Z'
+                      created_at: '2026-08-05T00:00:00Z'
+                      updated_at: '2026-08-05T00:00:00Z'
+                    is_active: true
+                    date_joined: '2026-08-11T09:00:00Z'
+                summary: Rôle assigné
+              RôleInexistant:
+                value:
+                  role_id:
+                  - Le rôle spécifié n'existe pas.
+                summary: Rôle inexistant
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserAssignRoleRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserAssignRoleRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignRoleResponse'
+              examples:
+                RequêteValide:
+                  value:
+                    role_id: 2
+                  summary: Requête valide
+                RôleAssigné:
+                  value:
+                    message: Rôle 'MANAGER' assigné avec succès à l'utilisateur 'targetuser'.
+                    user:
+                      id: 3
+                      email: target@example.com
+                      username: targetuser
+                      first_name: ''
+                      last_name: ''
+                      role:
+                        id: 2
+                        name: MANAGER
+                        description: Gestionnaire
+                        permissions:
+                        - 1
+                        - 2
+                        - 5
+                        - 6
+                        permissions_detail:
+                        - id: 1
+                          code: users.read
+                          description: Consulter la liste/détails des utilisateurs
+                          created_at: '2026-08-05T00:00:00Z'
+                        - id: 2
+                          code: users.write
+                          description: Créer et modifier des utilisateurs
+                          created_at: '2026-08-05T00:00:00Z'
+                        - id: 5
+                          code: profile.read
+                          description: Consulter son propre profil
+                          created_at: '2026-08-05T00:00:00Z'
+                        - id: 6
+                          code: profile.write
+                          description: Modifier son propre profil
+                          created_at: '2026-08-05T00:00:00Z'
+                        created_at: '2026-08-05T00:00:00Z'
+                        updated_at: '2026-08-05T00:00:00Z'
+                      is_active: true
+                      date_joined: '2026-08-11T09:00:00Z'
+                  summary: Rôle assigné
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                RôleInexistant:
+                  value:
+                    role_id:
+                    - Le rôle spécifié n'existe pas.
+                  summary: Rôle inexistant
+                ChampInvalide:
+                  value:
+                    password:
+                    - Ce mot de passe est trop court.
+                  summary: Champ invalide
+          description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                PermissionManquante:
+                  value:
+                    detail: 'Permission requise manquante : ''roles.manage''.'
+                  summary: Permission manquante
+          description: 'Accès refusé : permission insuffisante pour ce rôle.'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                Introuvable:
+                  value:
+                    detail: Not found.
+          description: Ressource introuvable.
+  /api/users/me/:
+    get:
+      operationId: users_me_retrieve
+      description: Retourne les informations de l'utilisateur authentifié, y compris
+        son rôle (objet détaillé). Exige un Access Token valide dans l'en-tête Authorization.
+      summary: Consulter son profil
+      tags:
+      - Users
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+              examples:
+                ProfilRécupéré:
+                  value:
+                    id: 1
+                    email: jane.doe@example.com
+                    username: janedoe
+                    first_name: Jane
+                    last_name: Doe
+                    role:
+                      id: 3
+                      name: USER
+                      description: Utilisateur standard
+                      permissions:
+                      - 5
+                      - 6
+                      permissions_detail:
+                      - id: 5
+                        code: profile.read
+                        description: Consulter son propre profil
+                        created_at: '2026-08-05T00:00:00Z'
+                      - id: 6
+                        code: profile.write
+                        description: Modifier son propre profil
+                        created_at: '2026-08-05T00:00:00Z'
+                      created_at: '2026-08-05T00:00:00Z'
+                      updated_at: '2026-08-05T00:00:00Z'
+                    is_active: true
+                    date_joined: '2026-08-11T09:00:00Z'
+                  summary: Profil récupéré
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+    patch:
+      operationId: users_me_partial_update
+      description: Met à jour les champs éditables du profil de l'utilisateur authentifié
+        (first_name, last_name, username). Les champs sensibles (email, rôle) ne sont
+        pas modifiables via cet endpoint. Exige un Access Token valide.
+      summary: Mettre à jour son profil
+      tags:
+      - Users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileUpdateRequest'
+            examples:
+              MiseÀJourDuNom:
+                value:
+                  first_name: Jane
+                  last_name: Smith
+                summary: Mise à jour du nom
+              ProfilMisÀJour:
+                value:
+                  first_name: Jane
+                  last_name: Smith
+                  username: janedoe
+                summary: Profil mis à jour
+              UsernameDéjàUtilisé:
+                value:
+                  username:
+                  - Ce nom d'utilisateur est déjà utilisé.
+                summary: Username déjà utilisé
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileUpdateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserProfileUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileUpdate'
+              examples:
+                MiseÀJourDuNom:
+                  value:
+                    first_name: Jane
+                    last_name: Smith
+                  summary: Mise à jour du nom
+                ProfilMisÀJour:
+                  value:
+                    first_name: Jane
+                    last_name: Smith
+                    username: janedoe
+                  summary: Profil mis à jour
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+              examples:
+                UsernameDéjàUtilisé:
+                  value:
+                    username:
+                    - Ce nom d'utilisateur est déjà utilisé.
+                  summary: Username déjà utilisé
+                ChampInvalide:
+                  value:
+                    password:
+                    - Ce mot de passe est trop court.
+                  summary: Champ invalide
+          description: 'Requête invalide : un ou plusieurs champs sont rejetés.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailResponse'
+              examples:
+                TokenInvalide:
+                  value:
+                    detail: Given token not valid for any token type
+                  summary: Token invalide
+          description: 'Non authentifié : token absent, invalide ou expiré.'
+components:
+  schemas:
+    AssignRoleResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Message de confirmation.
+        user:
+          $ref: '#/components/schemas/UserDetail'
+      required:
+      - message
+      - user
+    CustomTokenObtainPairRequest:
+      type: object
+      description: |-
+        Sérialiseur de connexion JWT (AUTH-011 & AUTH-014).
+        Authentifie l'utilisateur via son email et injecte le rôle dans le payload du token.
+      properties:
+        email:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - email
+      - password
+    DetailResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Message descriptif.
+      required:
+      - detail
+    LoginResponse:
+      type: object
+      properties:
+        access:
+          type: string
+          description: Access token JWT (15 min).
+        refresh:
+          type: string
+          description: Refresh token JWT (7 jours).
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+      - access
+      - refresh
+      - user
+    LogoutRequest:
+      type: object
+      description: |-
+        Sérialiseur pour valider le refresh token fourni lors de la déconnexion.
+        Effectue la mise en liste noire (blacklist) du token lors de l'exécution de save().
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          description: Le token de rafraîchissement à invalider.
+      required:
+      - refresh
+    PatchedRoleRequest:
+      type: object
+      description: |-
+        Sérialiseur pour les opérations CRUD sur les rôles.
+        Expose les permissions sous forme d'objets en lecture et accepte leurs IDs en écriture.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          title: Nom du rôle
+          maxLength: 50
+        description:
+          type: string
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: integer
+    PatchedUserProfileUpdateRequest:
+      type: object
+      description: |-
+        Sérialiseur permettant à un utilisateur de mettre à jour son propre profil.
+        Les champs sensibles (email, role, is_staff, etc.) sont exclus du champ d'édition.
+      properties:
+        first_name:
+          type: string
+          title: Prénom
+          maxLength: 150
+        last_name:
+          type: string
+          title: Nom
+          maxLength: 150
+        username:
+          type: string
+          minLength: 1
+          title: Nom d’utilisateur
+          description: Requis. 150 caractères maximum. Uniquement des lettres, nombres
+            et les caractères « @ », « . », « + », « - » et « _ ».
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+    Permission:
+      type: object
+      description: Sérialiseur pour la lecture des permissions.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+          title: Code permission
+        description:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - code
+      - created_at
+      - description
+      - id
+    RegisterRequest:
+      type: object
+      description: |-
+        Sérialiseur pour la création de compte (AUTH-010).
+        Valide les données, applique les règles de sécurité sur le mot de passe,
+        hache le mot de passe et attribue le rôle par défaut 'USER'.
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          title: Adresse email
+          maxLength: 254
+        username:
+          type: string
+          minLength: 1
+          title: Nom d’utilisateur
+          description: Requis. 150 caractères maximum. Uniquement des lettres, nombres
+            et les caractères « @ », « . », « + », « - » et « _ ».
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        first_name:
+          type: string
+          title: Prénom
+          maxLength: 150
+        last_name:
+          type: string
+          title: Nom
+          maxLength: 150
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+          description: Mot de passe conforme aux exigences de sécurité Django.
+      required:
+      - email
+      - password
+      - username
+    Role:
+      type: object
+      description: |-
+        Sérialiseur pour les opérations CRUD sur les rôles.
+        Expose les permissions sous forme d'objets en lecture et accepte leurs IDs en écriture.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          title: Nom du rôle
+          maxLength: 50
+        description:
+          type: string
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: integer
+        permissions_detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/Permission'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - id
+      - name
+      - permissions_detail
+      - updated_at
+    RoleRequest:
+      type: object
+      description: |-
+        Sérialiseur pour les opérations CRUD sur les rôles.
+        Expose les permissions sous forme d'objets en lecture et accepte leurs IDs en écriture.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          title: Nom du rôle
+          maxLength: 50
+        description:
+          type: string
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: integer
+      required:
+      - name
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    TokenRefreshResponse:
+      type: object
+      properties:
+        access:
+          type: string
+          description: Nouvel access token (15 min).
+        refresh:
+          type: string
+          description: Nouveau refresh token après rotation (7 jours).
+      required:
+      - access
+      - refresh
+    User:
+      type: object
+      description: |-
+        Sérialiseur pour la lecture des informations d'un utilisateur.
+        Expose le nom du rôle pour éviter de renvoyer un simple ID.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Adresse email
+        username:
+          type: string
+          readOnly: true
+          title: Nom d’utilisateur
+          description: Requis. 150 caractères maximum. Uniquement des lettres, nombres
+            et les caractères « @ », « . », « + », « - » et « _ ».
+        first_name:
+          type: string
+          readOnly: true
+          title: Prénom
+        last_name:
+          type: string
+          readOnly: true
+          title: Nom
+        role:
+          type: string
+          readOnly: true
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Date d’inscription
+      required:
+      - date_joined
+      - email
+      - first_name
+      - id
+      - last_name
+      - role
+      - username
+    UserAssignRoleRequest:
+      type: object
+      description: Sérialiseur de validation pour l'assignation d'un rôle à un utilisateur.
+      properties:
+        role_id:
+          type: integer
+          description: ID du rôle à attribuer
+      required:
+      - role_id
+    UserDetail:
+      type: object
+      description: Sérialiseur détaillé pour afficher les informations de l'utilisateur
+        avec son rôle.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Adresse email
+        username:
+          type: string
+          readOnly: true
+          title: Nom d’utilisateur
+          description: Requis. 150 caractères maximum. Uniquement des lettres, nombres
+            et les caractères « @ », « . », « + », « - » et « _ ».
+        first_name:
+          type: string
+          readOnly: true
+          title: Prénom
+        last_name:
+          type: string
+          readOnly: true
+          title: Nom
+        role:
+          allOf:
+          - $ref: '#/components/schemas/Role'
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+          title: Actif
+          description: Précise si l’utilisateur doit être considéré comme actif. Décochez
+            ceci plutôt que de supprimer le compte.
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Date d’inscription
+      required:
+      - date_joined
+      - email
+      - first_name
+      - id
+      - is_active
+      - last_name
+      - role
+      - username
+    UserProfileUpdate:
+      type: object
+      description: |-
+        Sérialiseur permettant à un utilisateur de mettre à jour son propre profil.
+        Les champs sensibles (email, role, is_staff, etc.) sont exclus du champ d'édition.
+      properties:
+        first_name:
+          type: string
+          title: Prénom
+          maxLength: 150
+        last_name:
+          type: string
+          title: Nom
+          maxLength: 150
+        username:
+          type: string
+          title: Nom d’utilisateur
+          description: Requis. 150 caractères maximum. Uniquement des lettres, nombres
+            et les caractères « @ », « . », « + », « - » et « _ ».
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+      required:
+      - username
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+- name: Auth
+  description: Inscription, connexion, refresh et logout
+- name: Users
+  description: Profil utilisateur
+- name: Roles
+  description: Gestion des rôles et permissions
