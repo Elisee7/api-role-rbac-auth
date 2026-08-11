@@ -587,7 +587,7 @@ PY
   La validation de production doit désormais être faite avec un environnement isolé, sans placeholder de secret, et avec `DEBUG=False`.
 
   ---
-## 17. [2026-08-12] Finitions AUTH-034 : bloc `else` développement et validation CORS production
+## 17. [2026-08-11] Finitions AUTH-034 : bloc `else` développement et validation CORS production
 - **Ticket associé :** `AUTH-034` — Durcissement CORS / HTTPS
 - **Symptômes :**
   1. Le bloc conditionnel `if not DEBUG:` dans `settings.py` n'avait pas de
