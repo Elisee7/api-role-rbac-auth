@@ -42,7 +42,7 @@ API REST sécurisée d'authentification JWT (access + refresh) et de gestion des
 ```bash
 # 1. Cloner le dépôt
 git clone https://github.com/Elisee7/api-role-rbac-auth.git
-cd p1_v4_1_api_auth/backend
+cd api-role-rbac-auth/backend
 
 # 2. Créer et activer un environnement virtuel
 python -m venv venv

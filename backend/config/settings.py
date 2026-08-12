@@ -86,16 +86,39 @@ def env_bool(name: str, default: bool = False) -> bool:
 
 """
 Sécurité : SECRET_KEY.
-
 La clé secrète doit être fournie par variable d'environnement.
 Elle ne doit jamais être codée en dur ni commitée avec une vraie valeur.
+Un placeholder connu est explicitement rejeté, même s'il satisfait
+la longueur minimale requise par Django (fail-closed).
 """
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-
 if not SECRET_KEY:
     raise ImproperlyConfigured(
         "La variable d'environnement DJANGO_SECRET_KEY est obligatoire."
     )
+
+# Nettoyage des espaces et d'éventuels guillemets résiduels.
+_secret_key_stripped = SECRET_KEY.strip().strip("'\"")
+_SECRET_KEY_PLACEHOLDERS = {
+    "CHANGE_ME",
+    "CHANGEME",
+    "CHANGE_ME_WITH_A_STRONG_SECRET_KEY_OF_AT_LEAST_50_CHARACTERS",
+    "PLACEHOLDER",
+    "INSERT_SECRET_KEY_HERE",
+    "YOUR_SECRET_KEY",
+    "SECRET_KEY",
+    "DJANGO_SECRET_KEY",
+}
+if _secret_key_stripped.upper() in _SECRET_KEY_PLACEHOLDERS:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY contient un placeholder connu. "
+        "Générez une clé aléatoire avec : "
+        "python -c \"from django.core.management.utils import "
+        "get_random_secret_key; print(get_random_secret_key())\""
+    )
+# On utilise la valeur nettoyée pour éviter les surprises liées aux
+# espaces ou guillemets parasites présents dans l'environnement.
+SECRET_KEY = _secret_key_stripped
 
 """
 Mode debug.
