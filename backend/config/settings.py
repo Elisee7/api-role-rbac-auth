@@ -99,7 +99,13 @@ if _secret_key_raw is None:
 
 # Nettoyage des espaces et d'éventuels guillemets résiduels.
 # Triple nettoyage : espaces externes -> guillemets -> espaces internes résiduels
-_secret_key_stripped = _secret_key_raw.strip().strip("'\"").strip()
+_secret_key_stripped = _secret_key_raw.strip()
+if (
+    len(_secret_key_stripped) >= 2
+    and _secret_key_stripped[0] == _secret_key_stripped[-1]
+    and _secret_key_stripped[0] in {"'", '"'}
+):
+    _secret_key_stripped = _secret_key_stripped[1:-1].strip()
 if not _secret_key_stripped:
     raise ImproperlyConfigured(
         "DJANGO_SECRET_KEY ne peut pas être vide après nettoyage."
