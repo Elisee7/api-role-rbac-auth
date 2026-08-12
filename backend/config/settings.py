@@ -91,14 +91,20 @@ Elle ne doit jamais être codée en dur ni commitée avec une vraie valeur.
 Un placeholder connu est explicitement rejeté, même s'il satisfait
 la longueur minimale requise par Django (fail-closed).
 """
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-if not SECRET_KEY:
+_secret_key_raw = os.getenv("DJANGO_SECRET_KEY")
+if _secret_key_raw is None:
     raise ImproperlyConfigured(
         "La variable d'environnement DJANGO_SECRET_KEY est obligatoire."
     )
 
 # Nettoyage des espaces et d'éventuels guillemets résiduels.
-_secret_key_stripped = SECRET_KEY.strip().strip("'\"")
+# Triple nettoyage : espaces externes -> guillemets -> espaces internes résiduels
+_secret_key_stripped = _secret_key_raw.strip().strip("'\"").strip()
+if not _secret_key_stripped:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY ne peut pas être vide après nettoyage."
+    )
+
 _SECRET_KEY_PLACEHOLDERS = {
     "CHANGE_ME",
     "CHANGEME",
@@ -286,12 +292,12 @@ REST_FRAMEWORK = {
 
 SIMPLE_JWT = {
     # Durées de vie des jetons
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),   # CDC 5.2 : Courte durée[cite: 1]
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),       # CDC 5.2 : Longue durée[cite: 1]
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),   # CDC 5.2 : Courte durée
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),       # CDC 5.2 : Longue durée
 
     # Sécurité & Invalidation
-    'ROTATE_REFRESH_TOKENS': True,                     # CDC 5.2 : Nouveau refresh token à chaque rafraîchissement[cite: 1]
-    'BLACKLIST_AFTER_ROTATION': True,                  # CDC 5.2 : Invalide l'ancien refresh token[cite: 1]
+    'ROTATE_REFRESH_TOKENS': True,                     # CDC 5.2 : Nouveau refresh token à chaque rafraîchissement
+    'BLACKLIST_AFTER_ROTATION': True,                  # CDC 5.2 : Invalide l'ancien refresh token
     'UPDATE_LAST_LOGIN': False,
 
     'ALGORITHM': 'HS256',
